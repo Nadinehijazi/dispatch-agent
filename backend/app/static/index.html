@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NYC Complaint Dispatch Assistant</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <h1>NYC Complaint Dispatch Assistant</h1>
+        <p>Report a city issue and receive an evidence-backed routing decision. This system reduces dispatcher workload while keeping decisions transparent and auditable.</p>
+      </div>
+      <div class="hero-card">
+        <div class="hero-card__title">How it works</div>
+        <ul>
+          <li>We save your complaint securely.</li>
+          <li>The agent compares with real 311 history.</li>
+          <li>If uncertain, it recommends human review.</li>
+        </ul>
+      </div>
+    </header>
+
+    <section class="panel form-panel">
+      <h2>Submit a complaint</h2>
+      <form id="complaintForm">
+        <div class="grid">
+          <div>
+            <label for="full_name">Full name<span class="required">*</span></label>
+            <input id="full_name" name="full_name" type="text" required placeholder="Jane Doe" />
+          </div>
+          <div>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" placeholder="jane@example.com" />
+          </div>
+          <div>
+            <label for="phone">Phone</label>
+            <input id="phone" name="phone" type="tel" placeholder="(555) 555-1234" />
+          </div>
+          <div>
+            <label for="borough">Borough</label>
+            <select id="borough" name="borough">
+              <option value="">UNKNOWN</option>
+              <option value="BROOKLYN">BROOKLYN</option>
+              <option value="MANHATTAN">MANHATTAN</option>
+              <option value="QUEENS">QUEENS</option>
+              <option value="BRONX">BRONX</option>
+              <option value="STATEN ISLAND">STATEN ISLAND</option>
+            </select>
+          </div>
+          <div>
+            <label for="incident_time">Incident time</label>
+            <input id="incident_time" name="incident_time" type="text" placeholder="2am, 14:30, last night" />
+          </div>
+          <div>
+            <label for="urgency_hint">Urgency hint</label>
+            <select id="urgency_hint" name="urgency_hint">
+              <option value="">(none)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+        </div>
+        <div class="stack">
+          <label for="complaint_text">Complaint details<span class="required">*</span></label>
+          <textarea id="complaint_text" name="complaint_text" required placeholder="Describe the issue and any details that may help dispatch."></textarea>
+        </div>
+        <div class="stack">
+          <label for="location_details">Location details</label>
+          <input id="location_details" name="location_details" type="text" placeholder="Street or landmark (kept in secure record only)" />
+        </div>
+        <label class="consent">
+          <input id="consent" name="consent" type="checkbox" />
+          I consent to share this information for triage and routing.
+        </label>
+        <div class="actions">
+          <button id="submitBtn" type="submit">Submit complaint</button>
+          <span id="status" class="status">Ready.</span>
+        </div>
+        <div id="errorBox" class="error-box" role="alert"></div>
+      </form>
+    </section>
+
+    <section class="panel quick-panel">
+      <h2>Quick run (prompt only)</h2>
+      <p class="muted">For grading or quick testing, run the agent directly with a single prompt.</p>
+      <div class="stack">
+        <label for="quick_prompt">Prompt</label>
+        <textarea id="quick_prompt" placeholder="Describe the issue in one paragraph."></textarea>
+      </div>
+      <div class="actions">
+        <button id="quickRunBtn" type="button">Run Agent</button>
+        <span id="quickStatus" class="status">Ready.</span>
+      </div>
+    </section>
+
+    <section class="panel decision-panel">
+      <div id="reviewBanner" class="review-banner">Human review recommended: low confidence or missing info.</div>
+      <div class="decision-header">
+        <div class="chip" id="agencyChip">Agency: —</div>
+        <div class="chip" id="urgencyChip">Urgency: —</div>
+      </div>
+      <div class="decision-grid">
+        <div>
+          <h3>Recommended action</h3>
+          <p id="actionText">—</p>
+        </div>
+        <div>
+          <h3>Justification</h3>
+          <p id="justificationText">—</p>
+        </div>
+      </div>
+      <div>
+        <h3>Confidence</h3>
+        <div class="confidence-bar"><div id="confidenceFill" class="confidence-fill"></div></div>
+        <div id="confidenceLabel" class="status">—</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary>Trace steps (audit)</summary>
+        <pre id="stepsTrace">—</pre>
+      </details>
+    </section>
+
+    <section class="panel">
+      <h3>Recent complaints</h3>
+      <div id="historyList" class="history-list">No records yet.</div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

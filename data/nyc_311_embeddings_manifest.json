@@ -1,0 +1,19 @@
+{
+  "input": "data/nyc_311_cleaned.csv",
+  "output": "data/nyc_311_embeddings.jsonl",
+  "rows_embedded": 2000,
+  "start": 0,
+  "limit": 2000,
+  "provider": "openai",
+  "model": "text-embedding-3-small",
+  "dimensions": 1536,
+  "metadata_fields": [
+    "agency",
+    "agency_name",
+    "borough",
+    "created_date",
+    "status",
+    "open_data_channel_type",
+    "complaint_text"
+  ]
+}

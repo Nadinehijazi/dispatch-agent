@@ -1,0 +1,19 @@
+{
+  "input": "data/nyc_311_sample_locked.csv",
+  "output": "data/nyc_311_embeddings_llmod.jsonl",
+  "rows_embedded": 100,
+  "start": 0,
+  "limit": 100,
+  "provider": "llmod-openai-compat",
+  "model": "RPRTHPB-text-embedding-3-small",
+  "dimensions": 1536,
+  "metadata_fields": [
+    "agency",
+    "created_date",
+    "status",
+    "open_data_channel_type",
+    "complaint_type",
+    "descriptor",
+    "borough"
+  ]
+}
