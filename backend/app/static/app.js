@@ -2,7 +2,10 @@ const form = document.getElementById("complaintForm");
 const statusEl = document.getElementById("status");
 const errorBox = document.getElementById("errorBox");
 const submitBtn = document.getElementById("submitBtn");
-const stepsTraceEl = document.getElementById("stepsTrace");
+const traceWrap = document.getElementById("traceWrap");
+const rawOutput = document.getElementById("rawOutput");
+const copyFinalBtn = document.getElementById("copyFinalBtn");
+const copyStatus = document.getElementById("copyStatus");
 const agencyChip = document.getElementById("agencyChip");
 const urgencyChip = document.getElementById("urgencyChip");
 const actionText = document.getElementById("actionText");
@@ -14,6 +17,9 @@ const historyList = document.getElementById("historyList");
 const quickPrompt = document.getElementById("quick_prompt");
 const quickRunBtn = document.getElementById("quickRunBtn");
 const quickStatus = document.getElementById("quickStatus");
+
+const submitBtnDefaultText = submitBtn ? submitBtn.textContent : "Submit complaint";
+const quickBtnDefaultText = quickRunBtn ? quickRunBtn.textContent : "Run Agent";
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -29,23 +35,108 @@ function clearError() {
   errorBox.style.display = "none";
 }
 
+function setButtonLoading(button, isLoading, runningLabel, defaultLabel) {
+  if (!button) return;
+  button.disabled = isLoading;
+  if (isLoading) {
+    button.innerHTML = `<span class="spinner" aria-hidden="true"></span> ${runningLabel}`;
+  } else {
+    button.textContent = defaultLabel;
+  }
+}
+
 function updateUrgency(urgency) {
   urgencyChip.className = "chip";
   if (urgency === "low") urgencyChip.classList.add("urgency-low");
   if (urgency === "medium") urgencyChip.classList.add("urgency-medium");
   if (urgency === "high") urgencyChip.classList.add("urgency-high");
-  urgencyChip.textContent = `Urgency: ${urgency || "—"}`;
+  urgencyChip.textContent = `Urgency: ${urgency || "-"}`;
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function copyText(text) {
+  await navigator.clipboard.writeText(text);
+}
+
+function prettyJson(obj) {
+  try {
+    return JSON.stringify(obj ?? null, null, 2);
+  } catch {
+    return String(obj);
+  }
+}
+
+function renderTraceSteps(steps) {
+  const arr = Array.isArray(steps) ? steps : [];
+
+  if (!traceWrap) return;
+  if (arr.length === 0) {
+    traceWrap.innerHTML = `<p class="status">No steps.</p>`;
+    return;
+  }
+
+  traceWrap.innerHTML = arr.map((s, idx) => {
+    const module = escapeHtml(s.module || `Step ${idx + 1}`);
+    const promptRaw = prettyJson(s.prompt);
+    const responseRaw = prettyJson(s.response);
+    const promptJson = escapeHtml(promptRaw);
+    const responseJson = escapeHtml(responseRaw);
+
+    return `
+      <details class="step-card">
+        <summary>Step ${idx + 1}</summary>
+        <div class="step-body">
+          <div class="kv">
+            <div class="kv-title">Module</div>
+            <pre class="json">${module}</pre>
+          </div>
+          <div class="kv">
+            <div class="kv-title">
+              Prompt JSON
+              <button class="btn-secondary copy-step" type="button" data-copy="${escapeHtml(promptRaw)}">Copy JSON</button>
+            </div>
+            <pre class="json">${promptJson}</pre>
+          </div>
+          <div class="kv">
+            <div class="kv-title">
+              Response JSON
+              <button class="btn-secondary copy-step" type="button" data-copy="${escapeHtml(responseRaw)}">Copy JSON</button>
+            </div>
+            <pre class="json">${responseJson}</pre>
+          </div>
+        </div>
+      </details>
+    `;
+  }).join("");
+
+  traceWrap.querySelectorAll(".copy-step").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        await copyText(btn.getAttribute("data-copy") || "");
+      } catch {}
+    });
+  });
 }
 
 function resetDecision() {
-  agencyChip.textContent = "Agency: —";
+  agencyChip.textContent = "Agency: -";
   updateUrgency(null);
-  actionText.textContent = "—";
-  justificationText.textContent = "—";
+  actionText.textContent = "-";
+  justificationText.textContent = "-";
   confidenceFill.style.width = "0%";
-  confidenceLabel.textContent = "—";
+  confidenceLabel.textContent = "-";
   reviewBanner.style.display = "none";
-  stepsTraceEl.textContent = "—";
+  if (traceWrap) traceWrap.innerHTML = `<p class="status">-</p>`;
+  if (rawOutput) rawOutput.textContent = "-";
+  if (copyStatus) copyStatus.textContent = "";
 }
 
 async function loadHistory() {
@@ -61,7 +152,7 @@ async function loadHistory() {
       const borough = item.borough || "UNKNOWN";
       const status = item.status || "new";
       const summary = (item.complaint_text || "").slice(0, 80);
-      return `<div class="history-item"><strong>${name}</strong> · ${borough} · ${status}<br/>${summary}</div>`;
+      return `<div class="history-item"><strong>${escapeHtml(name)}</strong> | ${escapeHtml(borough)} | ${escapeHtml(status)}<br/>${escapeHtml(summary)}</div>`;
     }).join("");
   } catch (e) {
     historyList.textContent = "Unable to load history.";
@@ -69,22 +160,38 @@ async function loadHistory() {
 }
 
 function renderDecision(execData) {
-  stepsTraceEl.textContent = JSON.stringify(execData.steps ?? [], null, 2);
+  renderTraceSteps(execData.steps);
+  if (rawOutput) rawOutput.textContent = String(execData.response ?? "");
+
   const decisionStep = (execData.steps || []).find((s) => s.module === "Decide_DispatchDecision");
   const reviewStep = (execData.steps || []).find((s) => s.module === "Human_Review_Escalation");
   const decision = decisionStep ? decisionStep.response : null;
 
   if (decision) {
-    agencyChip.textContent = `Agency: ${decision.agency || "—"}`;
+    agencyChip.textContent = `Agency: ${decision.agency || "-"}`;
     updateUrgency(decision.urgency);
-    actionText.textContent = decision.action || "—";
-    justificationText.textContent = decision.justification || "—";
+    actionText.textContent = decision.action || "-";
+    justificationText.textContent = decision.justification || "-";
     const confidence = Number(decision.confidence || 0);
     confidenceFill.style.width = `${Math.min(100, Math.round(confidence * 100))}%`;
     confidenceLabel.textContent = `Confidence: ${(confidence * 100).toFixed(0)}%`;
     if (reviewStep && reviewStep.response && reviewStep.response.needs_human_review) {
       reviewBanner.style.display = "flex";
     }
+  }
+
+  if (copyFinalBtn) {
+    copyFinalBtn.onclick = async () => {
+      try {
+        await copyText(prettyJson(execData));
+        if (copyStatus) copyStatus.textContent = "Copied.";
+        setTimeout(() => {
+          if (copyStatus) copyStatus.textContent = "";
+        }, 1200);
+      } catch {
+        if (copyStatus) copyStatus.textContent = "Copy failed.";
+      }
+    };
   }
 }
 
@@ -110,8 +217,8 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  submitBtn.disabled = true;
-  setStatus("Saving complaint...");
+  setButtonLoading(submitBtn, true, "Running...", submitBtnDefaultText);
+  setStatus("Running...");
 
   try {
     const createRes = await fetch("/api/complaints", {
@@ -124,18 +231,19 @@ form.addEventListener("submit", async (event) => {
       throw new Error(createData.error || "Failed to save complaint.");
     }
 
-    setStatus("Running agent...");
     const execRes = await fetch("/api/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ complaint_id: createData.complaint_id }),
     });
     const execData = await execRes.json();
-    if (execData.status !== "ok") {
-      throw new Error(execData.error || "Agent failed to run.");
-    }
-
     renderDecision(execData);
+
+    if (execData.status !== "ok") {
+      showError(execData.error || "Agent failed to run.");
+      setStatus("Error");
+      return;
+    }
 
     setStatus("Done.");
     await loadHistory();
@@ -143,14 +251,14 @@ form.addEventListener("submit", async (event) => {
     showError(String(e));
     setStatus("Error");
   } finally {
-    submitBtn.disabled = false;
+    setButtonLoading(submitBtn, false, "Running...", submitBtnDefaultText);
   }
 });
 
 quickRunBtn.addEventListener("click", async () => {
   clearError();
   resetDecision();
-  quickRunBtn.disabled = true;
+  setButtonLoading(quickRunBtn, true, "Running...", quickBtnDefaultText);
   quickStatus.textContent = "Running...";
 
   try {
@@ -164,16 +272,19 @@ quickRunBtn.addEventListener("click", async () => {
       body: JSON.stringify({ prompt }),
     });
     const execData = await execRes.json();
-    if (execData.status !== "ok") {
-      throw new Error(execData.error || "Agent failed to run.");
-    }
     renderDecision(execData);
+
+    if (execData.status !== "ok") {
+      showError(execData.error || "Agent failed to run.");
+      quickStatus.textContent = "Error";
+      return;
+    }
     quickStatus.textContent = "Done.";
   } catch (e) {
     showError(String(e));
     quickStatus.textContent = "Error";
   } finally {
-    quickRunBtn.disabled = false;
+    setButtonLoading(quickRunBtn, false, "Running...", quickBtnDefaultText);
   }
 });
 

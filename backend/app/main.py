@@ -35,7 +35,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 @app.get("/api/team_info")
 def team_info():
     return {
-        "group_batch_order_number": "Batch1_06",
+        "group_batch_order_number": "Batch2_10",
         "team_name": "Nadine_Sara_Noor",
         "students": [
             {"name": "Nadine Hijazi", "email": "nadeenhijazi@campus.technion.ac.il"},
@@ -56,16 +56,6 @@ def agent_info():
             "Assist human dispatchers by standardizing triage decisions with evidence from similar historical cases. "
             "The agent recommends agency and urgency, provides transparent steps, and escalates when uncertain."
         ),
-        "modules": [
-            "Preprocessing_ContextExtraction",
-            "Reason_UnderstandComplaint",
-            "Act_RAG_RetrieveSimilarCases",
-            "Observe_SummarizeEvidence",
-            "Decide_DispatchDecision",
-            "Confidence_Gating",
-            "Human_Review_Escalation",
-            "Response_Generator",
-        ],
         "prompt_template": {
             "template": (
                 "You are a municipal dispatch agent.\n"
@@ -78,28 +68,285 @@ def agent_info():
         },
         "prompt_examples": [
             {
-                "prompt": "Noise complaint: loud party at 2am in Brooklyn, recurring every weekend.",
+                "prompt": "loud party at 2am in Brooklyn, recurring every weekend.",
                 "full_response": (
-                    "agency=NYC Noise / NYPD (non-emergency), urgency=medium, action=log + advise caller + patrol check if repeated, "
-                    "justification=late-night recurring disturbance, confidence=0.55"
+                    "Decision:\n"
+                    "- Agency: NYPD\n"
+                    "- Urgency: medium\n"
+                    "- Action: Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated\n"
+                    "- Justification: time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62\n"
+                    "- Confidence: 0.85\n"
                 ),
                 "steps": [
                     {
                         "module": "Preprocessing_ContextExtraction",
-                        "prompt": {"input": "Noise complaint: loud party at 2am in Brooklyn, recurring every weekend."},
+                        "prompt": {
+                            "input_prompt": "loud party at 2am in Brooklyn, recurring every weekend."
+                        },
                         "response": {
-                            "complaint_summary": "Recurring late-night noise disturbance (party) at 2am in Brooklyn",
-                            "signals": ["nighttime", "recurring"],
-                            "location": "Brooklyn"
+                            "extracted": {
+                                "category": "noise",
+                                "location": "Brooklyn",
+                                "borough": "BROOKLYN",
+                                "time_24h": "02:00",
+                                "recurrence": "every weekend",
+                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
+                            }
                         },
                     },
                     {
                         "module": "Reason_UnderstandComplaint",
-                        "prompt": {"task": "Infer urgency + route candidates (no RAG yet - stub)."},
+                        "prompt": {
+                            "parsed": {
+                                "category": "noise",
+                                "location": "Brooklyn",
+                                "borough": "BROOKLYN",
+                                "time_24h": "02:00",
+                                "recurrence": "every weekend",
+                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
+                            }
+                        },
                         "response": {
-                            "candidate_agencies": ["NYC Noise", "NYPD (non-emergency)"],
+                            "intent": "Handle a noise complaint",
+                            "constraints": ["recurring issue"],
+                            "missing_info": [],
+                        },
+                    },
+                    {
+                        "module": "Act_RAG_RetrieveSimilarCases",
+                        "prompt": {
+                            "parsed": {
+                                "category": "noise",
+                                "location": "Brooklyn",
+                                "borough": "BROOKLYN",
+                                "time_24h": "02:00",
+                                "recurrence": "every weekend",
+                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
+                            },
+                            "top_k": 3,
+                        },
+                        "response": {
+                            "cases": [
+                                {
+                                    "id": "67615984",
+                                    "score": 0.620864928,
+                                    "metadata": {
+                                        "agency": "NYPD",
+                                        "borough": "BROOKLYN",
+                                        "complaint_type": "Noise - Residential",
+                                        "created_date": "2026-01-26T00:13:20.000",
+                                        "descriptor": "Loud Music/Party",
+                                        "open_data_channel_type": "ONLINE",
+                                        "status": "Closed",
+                                    },
+                                },
+                                {
+                                    "id": "67611519",
+                                    "score": 0.620864928,
+                                    "metadata": {
+                                        "agency": "NYPD",
+                                        "borough": "BROOKLYN",
+                                        "complaint_type": "Noise - Residential",
+                                        "created_date": "2026-01-26T00:17:23.000",
+                                        "descriptor": "Loud Music/Party",
+                                        "open_data_channel_type": "ONLINE",
+                                        "status": "Closed",
+                                    },
+                                },
+                                {
+                                    "id": "67605642",
+                                    "score": 0.620768607,
+                                    "metadata": {
+                                        "agency": "NYPD",
+                                        "agency_name": "New York City Police Department",
+                                        "borough": "BROOKLYN",
+                                        "complaint_text": "Noise - Residential | Loud Music/Party | Residential Building/House | BROOKLYN",
+                                        "complaint_type": "Noise - Residential",
+                                        "created_date": "2026-01-25T18:36:35.000",
+                                        "descriptor": "Loud Music/Party",
+                                        "location_type": "Residential Building/House",
+                                        "open_data_channel_type": "MOBILE",
+                                        "status": "Closed",
+                                    },
+                                },
+                            ]
+                        },
+                    },
+                    {
+                        "module": "Observe_SummarizeEvidence",
+                        "prompt": {
+                            "cases": [
+                                {
+                                    "id": "67615984",
+                                    "score": 0.620864928,
+                                    "metadata": {
+                                        "agency": "NYPD",
+                                        "borough": "BROOKLYN",
+                                        "complaint_type": "Noise - Residential",
+                                        "created_date": "2026-01-26T00:13:20.000",
+                                        "descriptor": "Loud Music/Party",
+                                        "open_data_channel_type": "ONLINE",
+                                        "status": "Closed",
+                                    },
+                                },
+                                {
+                                    "id": "67611519",
+                                    "score": 0.620864928,
+                                    "metadata": {
+                                        "agency": "NYPD",
+                                        "borough": "BROOKLYN",
+                                        "complaint_type": "Noise - Residential",
+                                        "created_date": "2026-01-26T00:17:23.000",
+                                        "descriptor": "Loud Music/Party",
+                                        "open_data_channel_type": "ONLINE",
+                                        "status": "Closed",
+                                    },
+                                },
+                                {
+                                    "id": "67605642",
+                                    "score": 0.620768607,
+                                    "metadata": {
+                                        "agency": "NYPD",
+                                        "agency_name": "New York City Police Department",
+                                        "borough": "BROOKLYN",
+                                        "complaint_text": "Noise - Residential | Loud Music/Party | Residential Building/House | BROOKLYN",
+                                        "complaint_type": "Noise - Residential",
+                                        "created_date": "2026-01-25T18:36:35.000",
+                                        "descriptor": "Loud Music/Party",
+                                        "location_type": "Residential Building/House",
+                                        "open_data_channel_type": "MOBILE",
+                                        "status": "Closed",
+                                    },
+                                },
+                            ]
+                        },
+                        "response": {
+                            "top_cases": [
+                                {
+                                    "id": "67615984",
+                                    "score": 0.620864928,
+                                    "agency": "NYPD",
+                                    "complaint_type": "Noise - Residential",
+                                    "descriptor": "Loud Music/Party",
+                                    "status": "Closed",
+                                    "created_date": "2026-01-26T00:13:20.000",
+                                },
+                                {
+                                    "id": "67611519",
+                                    "score": 0.620864928,
+                                    "agency": "NYPD",
+                                    "complaint_type": "Noise - Residential",
+                                    "descriptor": "Loud Music/Party",
+                                    "status": "Closed",
+                                    "created_date": "2026-01-26T00:17:23.000",
+                                },
+                                {
+                                    "id": "67605642",
+                                    "score": 0.620768607,
+                                    "agency": "NYPD",
+                                    "complaint_type": "Noise - Residential",
+                                    "descriptor": "Loud Music/Party",
+                                    "status": "Closed",
+                                    "created_date": "2026-01-25T18:36:35.000",
+                                },
+                            ],
+                            "evidence_summary": "Retrieved similar historical cases from Pinecone. Top agencies: NYPD.",
+                            "agency_counts": {"NYPD": 3},
+                            "total_matches": 3,
+                            "top_score": 0.620864928,
+                        },
+                    },
+                    {
+                        "module": "Decide_DispatchDecision",
+                        "prompt": {
+                            "parsed": {
+                                "category": "noise",
+                                "location": "Brooklyn",
+                                "borough": "BROOKLYN",
+                                "time_24h": "02:00",
+                                "recurrence": "every weekend",
+                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
+                            },
+                            "draft_decision": {
+                                "agency_guess": "NYPD",
+                                "urgency_guess": "medium",
+                                "action_guess": "Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated",
+                                "confidence_stub": 0.55,
+                            },
+                            "evidence": {
+                                "top_cases": [
+                                    {
+                                        "id": "67615984",
+                                        "score": 0.620864928,
+                                        "agency": "NYPD",
+                                        "complaint_type": "Noise - Residential",
+                                        "descriptor": "Loud Music/Party",
+                                        "status": "Closed",
+                                        "created_date": "2026-01-26T00:13:20.000",
+                                    },
+                                    {
+                                        "id": "67611519",
+                                        "score": 0.620864928,
+                                        "agency": "NYPD",
+                                        "complaint_type": "Noise - Residential",
+                                        "descriptor": "Loud Music/Party",
+                                        "status": "Closed",
+                                        "created_date": "2026-01-26T00:17:23.000",
+                                    },
+                                    {
+                                        "id": "67605642",
+                                        "score": 0.620768607,
+                                        "agency": "NYPD",
+                                        "complaint_type": "Noise - Residential",
+                                        "descriptor": "Loud Music/Party",
+                                        "status": "Closed",
+                                        "created_date": "2026-01-25T18:36:35.000",
+                                    },
+                                ],
+                                "evidence_summary": "Retrieved similar historical cases from Pinecone. Top agencies: NYPD.",
+                                "agency_counts": {"NYPD": 3},
+                                "total_matches": 3,
+                                "top_score": 0.620864928,
+                            },
+                        },
+                        "response": {
+                            "agency": "NYPD",
                             "urgency": "medium",
-                            "missing_info": ["exact address/building type"],
+                            "action": "Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated",
+                            "justification": "time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62",
+                            "confidence": 0.85,
+                        },
+                    },
+                    {
+                        "module": "Confidence_Gating",
+                        "prompt": {"confidence": 0.85, "threshold": 0.6, "critical_missing": []},
+                        "response": {"passes": True},
+                    },
+                    {
+                        "module": "Human_Review_Escalation",
+                        "prompt": {"confidence": 0.85, "critical_missing": []},
+                        "response": {"needs_human_review": False, "reason": "none"},
+                    },
+                    {
+                        "module": "Response_Generator",
+                        "prompt": {
+                            "decision": {
+                                "agency": "NYPD",
+                                "urgency": "medium",
+                                "action": "Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated",
+                                "justification": "time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62",
+                                "confidence": 0.85,
+                            }
+                        },
+                        "response": {
+                            "text": (
+                                "Decision:\n"
+                                "- Agency: NYPD\n"
+                                "- Urgency: medium\n"
+                                "- Action: Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated\n"
+                                "- Justification: time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62\n"
+                                "- Confidence: 0.85\n"
+                            )
                         },
                     },
                 ],

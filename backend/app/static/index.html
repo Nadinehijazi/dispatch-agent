@@ -8,20 +8,11 @@
 </head>
 <body>
   <main class="shell">
-    <header class="hero">
-      <div>
-        <h1>NYC Complaint Dispatch Assistant</h1>
-        <p>Report a city issue and receive an evidence-backed routing decision. This system reduces dispatcher workload while keeping decisions transparent and auditable.</p>
+    <div class="brand-top">
+      <div class="brand-lockup">
+        <img src="/static/logo.png" alt="NYC 311 logo" class="brand-logo" />
       </div>
-      <div class="hero-card">
-        <div class="hero-card__title">How it works</div>
-        <ul>
-          <li>We save your complaint securely.</li>
-          <li>The agent compares with real 311 history.</li>
-          <li>If uncertain, it recommends human review.</li>
-        </ul>
-      </div>
-    </header>
+    </div>
 
     <section class="panel form-panel">
       <h2>Submit a complaint</h2>
@@ -100,31 +91,39 @@
     <section class="panel decision-panel">
       <div id="reviewBanner" class="review-banner">Human review recommended: low confidence or missing info.</div>
       <div class="decision-header">
-        <div class="chip" id="agencyChip">Agency: —</div>
-        <div class="chip" id="urgencyChip">Urgency: —</div>
+        <div class="chip" id="agencyChip">Agency: -</div>
+        <div class="chip" id="urgencyChip">Urgency: -</div>
       </div>
       <div class="decision-grid">
         <div>
           <h3>Recommended action</h3>
-          <p id="actionText">—</p>
+          <p id="actionText">-</p>
         </div>
         <div>
           <h3>Justification</h3>
-          <p id="justificationText">—</p>
+          <p id="justificationText">-</p>
         </div>
       </div>
       <div>
         <h3>Confidence</h3>
         <div class="confidence-bar"><div id="confidenceFill" class="confidence-fill"></div></div>
-        <div id="confidenceLabel" class="status">—</div>
+        <div id="confidenceLabel" class="status">-</div>
       </div>
+      <details class="raw-toggle">
+        <summary>Raw output</summary>
+        <pre id="rawOutput" class="json">-</pre>
+        <div class="btn-row">
+          <button id="copyFinalBtn" class="btn-secondary" type="button">Copy JSON</button>
+          <span id="copyStatus" class="status"></span>
+        </div>
+      </details>
     </section>
 
     <section class="panel">
-      <details>
-        <summary>Trace steps (audit)</summary>
-        <pre id="stepsTrace">—</pre>
-      </details>
+      <h3>Trace steps (audit)</h3>
+      <div id="traceWrap" class="trace-wrap">
+        <p class="status">-</p>
+      </div>
     </section>
 
     <section class="panel">
