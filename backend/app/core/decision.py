@@ -37,6 +37,15 @@ def build_dispatch_decision(
 
     confidence = float(draft_decision.get("confidence_stub", 0.5))
 
+    # Penalize missing critical fields (makes gating more meaningful)
+    if parsed.get("category") in (None, "unknown"):
+        confidence -= 0.15
+    if not parsed.get("location"):
+        confidence -= 0.10
+    if not parsed.get("time_24h"):
+        confidence -= 0.05
+    confidence = max(0.05, confidence)
+
     if evidence:
         agency_counts = evidence.get("agency_counts") or {}
         total_matches = int(evidence.get("total_matches") or 0)

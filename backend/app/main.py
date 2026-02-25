@@ -7,7 +7,7 @@ import os
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from .core.rag import retrieve_similar_cases, summarize_evidence
-
+from .core.llm_decider import llm_available, llm_decide
 
 from .core.preprocessing import (
     AGENCY_MAP,
@@ -423,7 +423,7 @@ def execute(req: ExecuteRequest):
     Course requirement:
     - Top-level response fields MUST be exactly: status, error, response, steps
     - steps[] MUST describe every LLM call in order (module + prompt + response)
-    Right now we have no LLM calls; we log deterministic steps for traceability.
+    “We use gated LLM calls only when confidence is low or critical info is missing, to minimize cost.”
     """
     try:
         complaint = None
@@ -514,27 +514,14 @@ def execute(req: ExecuteRequest):
             "prompt": {"parsed": parsed},
             "response": reasoning
         })
-
-        # -------- Steps trace (3) Act: RAG retrieve (stub) --------
-        try:
-            cases = retrieve_similar_cases(parsed, top_k=3)
-            steps.append({
-                "module": "Act_RAG_RetrieveSimilarCases",
-                "prompt": {"parsed": parsed, "top_k": 3},
-                "response": {"cases": cases}
-            })
-        except Exception as e:
-            steps.append({
-                "module": "Act_RAG_RetrieveSimilarCases",
-                "prompt": {"parsed": parsed, "top_k": 3},
-                "response": {"error": str(e)}
-            })
-            return {
-                "status": "error",
-                "error": f"RAG retrieval failed: {str(e)}",
-                "response": None,
-                "steps": steps
-            }
+        # -------- Steps trace (3) Act: RAG retrieve --------
+        rag_result = retrieve_similar_cases(parsed, top_k=3)
+        steps.append({
+            "module": "Act_RAG_RetrieveSimilarCases",
+            "prompt": {"parsed": parsed, "top_k": 3},
+            "response": rag_result
+        })
+        cases = rag_result.get("cases", []) if isinstance(rag_result, dict) else []
 
         # -------- Steps trace (4) Observe: summarize evidence --------
         evidence = summarize_evidence(cases)
@@ -544,24 +531,73 @@ def execute(req: ExecuteRequest):
             "response": evidence
         })
 
-        # -------- Steps trace (5) Decide --------
+        # -------- Build initial decision (rules + evidence) --------
         decision = build_dispatch_decision(parsed, draft_decision, evidence)
 
-        steps.append({
-            "module": "Decide_DispatchDecision",
-            "prompt": {"parsed": parsed, "draft_decision": draft_decision, "evidence": evidence},
-            "response": decision
-        })
-
-        # -------- Steps trace (6) Confidence gating --------
-        confidence = float(decision.get("confidence", 0.0))
+        # Compute once and reuse
         critical_missing = []
         if parsed.get("category") in (None, "unknown"):
             critical_missing.append("category")
         if not parsed.get("location"):
             critical_missing.append("location")
 
+        # -------- Optional gated LLM refinement (only when needed) --------
+        confidence = float(decision.get("confidence", 0.0))
+        rag_ok = isinstance(rag_result, dict) and rag_result.get("ok") is True
+        rag_skipped_or_failed = not rag_ok
+
+        should_call_llm = (
+                confidence < 0.6
+                or len(critical_missing) > 0
+                or (rag_skipped_or_failed and parsed.get("category") in (None, "unknown"))
+        )
+
+        if should_call_llm:
+            if llm_available():
+                try:
+                    llm_prompt_obj = {
+                        "parsed": parsed,
+                        "evidence": {
+                            "agency_counts": evidence.get("agency_counts"),
+                            "total_matches": evidence.get("total_matches"),
+                            "top_score": evidence.get("top_score"),
+                        },
+                        "current_decision": decision,
+                        "critical_missing": critical_missing,
+                    }
+                    llm_out = llm_decide(parsed, evidence=evidence)
+
+                    steps.append({
+                        "module": "LLM_Disambiguation",
+                        "prompt": llm_prompt_obj,
+                        "response": llm_out
+                    })
+
+                    decision = llm_out
+                except Exception as e:
+                    steps.append({
+                        "module": "LLM_Disambiguation",
+                        "prompt": {"parsed": parsed, "critical_missing": critical_missing},
+                        "response": {"skipped": False, "error": str(e)}
+                    })
+            else:
+                steps.append({
+                    "module": "LLM_Disambiguation",
+                    "prompt": {"parsed": parsed, "critical_missing": critical_missing},
+                    "response": {"skipped": True, "error": "LLM not configured"}
+                })
+
+        # -------- Steps trace: Decide (final decision) --------
+        steps.append({
+            "module": "Decide_DispatchDecision",
+            "prompt": {"parsed": parsed, "draft_decision": draft_decision, "evidence": evidence},
+            "response": decision
+        })
+
+        # -------- Steps trace: Confidence gating --------
+        confidence = float(decision.get("confidence", 0.0))
         needs_review = confidence < 0.6 or len(critical_missing) > 0
+
         steps.append({
             "module": "Confidence_Gating",
             "prompt": {"confidence": confidence, "threshold": 0.6, "critical_missing": critical_missing},
