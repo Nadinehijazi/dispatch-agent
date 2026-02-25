@@ -11,7 +11,7 @@ DEFAULT_OUTPUT = "data/nyc_311_embeddings_llmod.jsonl"
 DEFAULT_MANIFEST = "data/nyc_311_embeddings_llmod_manifest.json"
 
 
-def load_dotenv(path: str = ".env") -> None:
+def load_dotenv(path: str = "..env") -> None:
     if not os.path.exists(path):
         return
     with open(path, "r", encoding="utf-8") as f:
@@ -28,7 +28,7 @@ def load_dotenv(path: str = ".env") -> None:
 def require_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
-        raise ValueError(f"Missing required env var: {name}")
+        raise ValueError(f"Missing required .env var: {name}")
     return value
 
 

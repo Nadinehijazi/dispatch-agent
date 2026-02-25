@@ -8,7 +8,7 @@ import pandas as pd
 DEFAULT_INPUT = "data/nyc_311_sample_locked.csv"
 
 
-def load_dotenv(path: str = ".env") -> None:
+def load_dotenv(path: str = "..env") -> None:
     if not os.path.exists(path):
         return
     with open(path, "r", encoding="utf-8") as f:
@@ -25,7 +25,7 @@ def load_dotenv(path: str = ".env") -> None:
 def require_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
-        raise ValueError(f"Missing required env var: {name}")
+        raise ValueError(f"Missing required .env var: {name}")
     return value
 
 

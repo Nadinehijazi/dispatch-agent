@@ -41,7 +41,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_dotenv(path: str = ".env") -> None:
+def load_dotenv(path: str = "..env") -> None:
     if not os.path.exists(path):
         return
     with open(path, "r", encoding="utf-8") as f:

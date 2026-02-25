@@ -65,6 +65,17 @@ def _embed_one(text: str) -> List[float]:
     resp = client.embeddings.create(model=model, input=[text])
     return resp.data[0].embedding
 
+def _case_to_text(meta: Dict[str, Any]) -> str:
+    parts = []
+    for k in ["complaint_type", "descriptor", "location_type", "agency", "borough", "status", "created_date"]:
+        v = meta.get(k)
+        if v:
+            parts.append(f"{k}={v}")
+    # fall back to complaint_text if exists
+    if meta.get("complaint_text"):
+        parts.append(f"text={meta['complaint_text']}")
+    return " | ".join(parts) if parts else ""
+
 
 def retrieve_similar_cases(parsed: Dict[str, Any], top_k: int = 3) -> Dict[str, Any]:
     """
@@ -101,7 +112,13 @@ def retrieve_similar_cases(parsed: Dict[str, Any], top_k: int = 3) -> Dict[str, 
 
         cases = []
         for match in result.matches or []:
-            cases.append({"id": match.id, "score": match.score, "metadata": match.metadata or {}})
+            meta = match.metadata or {}
+            cases.append({
+                "id": match.id,
+                "score": match.score,
+                "metadata": meta,
+                "case_text": _case_to_text(meta),
+            })
 
         return {"ok": True, "cases": cases}
     except Exception as e:
