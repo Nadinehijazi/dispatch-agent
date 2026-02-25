@@ -81,7 +81,7 @@ def llm_decide(parsed: Dict[str, Any], evidence: Optional[Dict[str, Any]] = None
             {"role": "system", "content": system},
             {"role": "user", "content": str(user)},
         ],
-        temperature=0.1,
+        temperature=1,
     )
 
     text = resp.choices[0].message.content or "{}"
