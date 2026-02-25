@@ -19,7 +19,7 @@ def _load_dotenv(path: str = ".env") -> None:
 def _require_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
-        raise ValueError(f"Missing required env var: {name}")
+        raise ValueError(f"Missing required .env var: {name}")
     return value
 
 
