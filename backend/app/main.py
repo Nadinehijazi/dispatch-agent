@@ -596,12 +596,14 @@ def execute(req: ExecuteRequest):
 
         # -------- Steps trace: Confidence gating --------
         confidence = float(decision.get("confidence", 0.0))
-        needs_review = confidence < 0.6 or len(critical_missing) > 0
+
+        passes = confidence >= 0.6
+        needs_review = (confidence < 0.6) or (len(critical_missing) > 0)
 
         steps.append({
             "module": "Confidence_Gating",
             "prompt": {"confidence": confidence, "threshold": 0.6, "critical_missing": critical_missing},
-            "response": {"passes": not needs_review}
+            "response": {"passes": passes}
         })
 
         steps.append({
@@ -609,7 +611,13 @@ def execute(req: ExecuteRequest):
             "prompt": {"confidence": confidence, "critical_missing": critical_missing},
             "response": {
                 "needs_human_review": needs_review,
-                "reason": "low_confidence_or_missing_info" if needs_review else "none"
+                "reason": (
+                            "low_confidence"
+                            if confidence < 0.6
+                            else f"missing_fields: {critical_missing}"
+                            if len(critical_missing) > 0
+                            else "none"
+)
             }
         })
 

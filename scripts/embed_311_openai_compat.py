@@ -10,8 +10,22 @@ DEFAULT_INPUT = "data/nyc_311_sample_locked.csv"
 DEFAULT_OUTPUT = "data/nyc_311_embeddings_llmod.jsonl"
 DEFAULT_MANIFEST = "data/nyc_311_embeddings_llmod_manifest.json"
 
+# ---- ID TRACKER ----
+def load_seen(path="data/seen_ids.txt") -> set[str]:
+    if not os.path.exists(path):
+        return set()
+    with open(path, "r", encoding="utf-8") as f:
+        return set(line.strip() for line in f if line.strip())
 
-def load_dotenv(path: str = "..env") -> None:
+
+def append_seen(ids: list[str], path="data/seen_ids.txt") -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        for _id in ids:
+            f.write(f"{_id}\n")
+# ---------------------
+
+def load_dotenv(path: str = ".env") -> None:
     if not os.path.exists(path):
         return
     with open(path, "r", encoding="utf-8") as f:
@@ -91,6 +105,10 @@ def main() -> None:
     df = pd.read_csv(args.input)
     df = df.iloc[args.start: args.start + args.limit].copy()
 
+    seen_ids = load_seen()
+    df = df[~df["unique_key"].astype(str).isin(seen_ids)].copy()
+    print(f"Embedding {len(df)} new rows (skipped {len(seen_ids)} already seen)")
+
     df["complaint_text"] = df.apply(build_complaint_text, axis=1)
     texts = df["complaint_text"].astype(str).tolist()
     ids = df["unique_key"].astype(str).tolist()
@@ -140,9 +158,10 @@ def main() -> None:
         json.dump(manifest, f, indent=2)
         f.write("\n")
 
+    append_seen(df["unique_key"].astype(str).tolist())
+
     print(f"Wrote vectors to: {args.output}")
     print(f"Wrote manifest to: {args.manifest}")
-
 
 if __name__ == "__main__":
     main()
