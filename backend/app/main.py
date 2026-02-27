@@ -598,7 +598,8 @@ def execute(req: ExecuteRequest):
         confidence = float(decision.get("confidence", 0.0))
 
         passes = confidence >= 0.6
-        needs_review = (confidence < 0.6) or (len(critical_missing) > 0)
+        needs_review = (confidence < 0.6)
+        needs_followup = (len(critical_missing) > 0)
 
         steps.append({
             "module": "Confidence_Gating",

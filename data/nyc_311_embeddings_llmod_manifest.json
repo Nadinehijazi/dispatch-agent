@@ -1,9 +1,9 @@
 {
   "input": "data/nyc_311_sample_locked.csv",
   "output": "data/nyc_311_embeddings_llmod.jsonl",
-  "rows_embedded": 500,
+  "rows_embedded": 800,
   "start": 0,
-  "limit": 500,
+  "limit": 3000,
   "provider": "llmod-openai-compat",
   "model": "RPRTHPB-text-embedding-3-small",
   "dimensions": 1536,

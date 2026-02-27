@@ -4,12 +4,14 @@ from typing import Optional
 
 CATEGORY_KEYWORDS = {
     "noise": ["loud", "noise", "party", "music", "shouting"],
-    "sanitation": ["trash", "garbage", "rats", "smell", "dumping", "litter"],
-    "parking": ["blocked", "parking", "car", "vehicle", "double parked", "tow"],
+    "sanitation": ["trash", "garbage", "rats", "dumping", "litter"],    "parking": ["blocked", "parking", "car", "vehicle", "double parked", "tow"],
     "street": ["pothole", "streetlight", "traffic light", "sidewalk", "road"],
     "water": ["leak", "water", "sewer", "flood", "hydrant"],
-    "safety": ["gun", "violence", "assault", "threat", "fight"],
-}
+    "safety": [
+        "gun", "violence", "assault", "threat", "fight",
+        "gas smell", "gas leak", "chemical smell", "chemical odor",
+        "fumes", "vapors", "carbon monoxide", "co alarm"
+    ],}
 
 AGENCY_MAP = {
     "noise": "Noise Control / Non-emergency Police",
@@ -66,12 +68,21 @@ def extract_recurrence(text: str) -> Optional[str]:
 
 def classify_category(text: str) -> str:
     t = text.lower()
+
+    # 🔥 Emergency override first
+    emergency_keywords = [
+        "gas smell", "gas leak", "chemical smell", "chemical odor",
+        "fumes", "vapors", "carbon monoxide", "co alarm"
+    ]
+    if any(k in t for k in emergency_keywords):
+        return "safety"
+
     scores = {}
     for cat, kws in CATEGORY_KEYWORDS.items():
         scores[cat] = sum(1 for kw in kws if kw in t)
+
     best = max(scores, key=scores.get)
     return best if scores[best] > 0 else "unknown"
-
 def estimate_urgency(text: str, category: str, time_24h: Optional[str]) -> str:
     t = text.lower()
     # safety always high
