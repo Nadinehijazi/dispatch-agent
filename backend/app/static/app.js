@@ -159,12 +159,18 @@ async function loadHistory() {
   }
 }
 
+function showBanner(text) {
+  reviewBanner.textContent = text;
+  reviewBanner.style.display = "flex";
+}
+
 function renderDecision(execData) {
   renderTraceSteps(execData.steps);
-  if (rawOutput) rawOutput.textContent = String(execData.response ?? "");
+  if (rawOutput) rawOutput.textContent = prettyJson(execData);
 
-  const decisionStep = (execData.steps || []).find((s) => s.module === "Decide_DispatchDecision");
-  const reviewStep = (execData.steps || []).find((s) => s.module === "Human_Review_Escalation");
+  const decisionStep = (execData.steps || []).find(
+    (s) => s.module === "Decide_DispatchDecision"
+  );
   const decision = decisionStep ? decisionStep.response : null;
 
   if (decision) {
@@ -172,14 +178,36 @@ function renderDecision(execData) {
     updateUrgency(decision.urgency);
     actionText.textContent = decision.action || "-";
     justificationText.textContent = decision.justification || "-";
+
     const confidence = Number(decision.confidence || 0);
     confidenceFill.style.width = `${Math.min(100, Math.round(confidence * 100))}%`;
     confidenceLabel.textContent = `Confidence: ${(confidence * 100).toFixed(0)}%`;
-    if (reviewStep && reviewStep.response && reviewStep.response.needs_human_review) {
-      reviewBanner.style.display = "flex";
-    }
   }
 
+  // ✅ Banner logic (read from Human_Review_Escalation step, not top-level)
+  const reviewStep = (execData.steps || []).find(
+    (s) => s.module === "Human_Review_Escalation"
+  );
+  const review = reviewStep ? (reviewStep.response || {}) : {};
+
+  const needsHumanReview = !!review.needs_human_review;
+  const needsFollowup = !!review.needs_followup;
+  const needsReview = !!review.needs_review;
+  const missing = Array.isArray(review.missing_fields) ? review.missing_fields : [];
+
+  if (needsHumanReview) {
+    reviewBanner.style.display = "flex";
+    if (needsFollowup) {
+      reviewBanner.textContent = `Follow-up required: missing ${missing.join(", ") || "required fields"}.`;
+    } else if (needsReview) {
+      reviewBanner.textContent = "Human review recommended: low confidence.";
+    } else {
+      reviewBanner.textContent = review.reason || "Human review recommended.";
+    }
+  } else {
+    reviewBanner.style.display = "none";
+    reviewBanner.textContent = "";
+  }
   if (copyFinalBtn) {
     copyFinalBtn.onclick = async () => {
       try {
@@ -214,6 +242,18 @@ form.addEventListener("submit", async (event) => {
 
   if (!payload.full_name || !payload.complaint_text) {
     showError("Full name and complaint details are required.");
+    return;
+  }
+
+  if (!payload.borough || payload.borough === "UNKNOWN") {
+    showError("Borough is required to submit a complaint.");
+    return;
+  }
+
+  // Optional: require location_details too
+  // (recommended for true dispatch tickets; borough alone might be insufficient)
+  if (!payload.location_details || payload.location_details.trim().length < 3) {
+    showError("Location details (address / landmark) are required to submit a complaint.");
     return;
   }
 

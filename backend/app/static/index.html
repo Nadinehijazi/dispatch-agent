@@ -31,7 +31,7 @@
             <input id="phone" name="phone" type="tel" placeholder="(555) 555-1234" />
           </div>
           <div>
-            <label for="borough">Borough</label>
+            <label for="borough">Borough<span class="required">*</span></label>
             <select id="borough" name="borough">
               <option value="">UNKNOWN</option>
               <option value="BROOKLYN">BROOKLYN</option>
@@ -60,8 +60,9 @@
           <textarea id="complaint_text" name="complaint_text" required placeholder="Describe the issue and any details that may help dispatch."></textarea>
         </div>
         <div class="stack">
-          <label for="location_details">Location details</label>
-          <input id="location_details" name="location_details" type="text" placeholder="Street or landmark (kept in secure record only)" />
+          <label for="location_details">Location details<span class="required">*</span></label>
+          <input id="location_details" name="location_details" type="text"
+          placeholder="Street or landmark (kept in secure record only)" />
         </div>
         <label class="consent">
           <input id="consent" name="consent" type="checkbox" />

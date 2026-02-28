@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 
-def _load_dotenv(path: str = "..env") -> None:
+def _load_dotenv(path: str = ".env") -> None:
     if not os.path.exists(path):
         return
     with open(path, "r", encoding="utf-8") as f:

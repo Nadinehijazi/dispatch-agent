@@ -389,8 +389,17 @@ def create_complaint(payload: ComplaintCreate):
     try:
         if not payload.full_name or not payload.full_name.strip():
             return {"status": "error", "error": "full_name is required", "complaint_id": None}
+
         if not payload.complaint_text or not payload.complaint_text.strip():
             return {"status": "error", "error": "complaint_text is required", "complaint_id": None}
+
+        # ✅ NEW CHECK: Borough required
+        if not payload.borough or payload.borough.upper() == "UNKNOWN":
+            return {"status": "error", "error": "borough is required", "complaint_id": None}
+
+        # ✅ NEW CHECK: Location details required
+        if not payload.location_details or not payload.location_details.strip():
+            return {"status": "error", "error": "location_details is required", "complaint_id": None}
 
         complaint_id = insert_complaint(
             {
@@ -399,16 +408,17 @@ def create_complaint(payload: ComplaintCreate):
                 "email": payload.email,
                 "complaint_text": payload.complaint_text.strip(),
                 "borough": payload.borough,
-                "location_details": payload.location_details,
+                "location_details": payload.location_details.strip(),
                 "incident_time": payload.incident_time,
                 "urgency_hint": payload.urgency_hint,
                 "status": "new",
             }
         )
+
         return {"status": "ok", "error": None, "complaint_id": complaint_id}
+
     except Exception as e:
         return {"status": "error", "error": f"Supabase insert failed: {str(e)}", "complaint_id": None}
-
 
 @app.get("/api/complaints_recent")
 def complaints_recent():
@@ -460,11 +470,21 @@ def execute(req: ExecuteRequest):
         recurrence = extract_recurrence(prompt_text)
         urgency = estimate_urgency(prompt_text, category, time_24h)
 
+        # structured fields from complaint (if exists)
+        location_details = None
+        if complaint and complaint.get("location_details"):
+            location_details = str(complaint.get("location_details")).strip() or None
+
+        # if NLP location missing, use structured location_details as fallback
+        if (not location) and location_details:
+            location = location_details
+
         borough = None
         if location and location.lower() in ["brooklyn", "manhattan", "queens", "bronx", "staten island"]:
             borough = location.upper()
         if complaint and complaint.get("borough"):
             borough = str(complaint.get("borough")).upper()
+
         if complaint and complaint.get("incident_time") and not time_24h:
             time_24h = complaint.get("incident_time")
 
@@ -486,13 +506,13 @@ def execute(req: ExecuteRequest):
 
         parsed = {
             "category": category,
-            "location": location,
+            "location": location,  # may now come from location_details
+            "location_details": location_details,  # keep for trace/audit
             "borough": borough,
             "time_24h": time_24h,
             "recurrence": recurrence,
             "complaint_text": prompt_text,
         }
-
         draft_decision = {
             "agency_guess": agency_guess,
             "urgency_guess": urgency,
@@ -536,9 +556,16 @@ def execute(req: ExecuteRequest):
 
         # Compute once and reuse
         critical_missing = []
+
         if parsed.get("category") in (None, "unknown"):
             critical_missing.append("category")
-        if not parsed.get("location"):
+
+        has_any_location = (
+                bool(str(parsed.get("location") or "").strip()) or
+                bool(str(parsed.get("location_details") or "").strip())
+        )
+
+        if not has_any_location:
             critical_missing.append("location")
 
         # -------- Optional gated LLM refinement (only when needed) --------
@@ -569,7 +596,7 @@ def execute(req: ExecuteRequest):
 
                     steps.append({
                         "module": "LLM_Disambiguation",
-                        "prompt": llm_prompt_obj,
+                        "prompt": {"parsed": parsed, "evidence": evidence},
                         "response": llm_out
                     })
 
@@ -598,8 +625,9 @@ def execute(req: ExecuteRequest):
         confidence = float(decision.get("confidence", 0.0))
 
         passes = confidence >= 0.6
-        needs_review = (confidence < 0.6)
-        needs_followup = (len(critical_missing) > 0)
+        needs_review = confidence < 0.6
+        needs_followup = len(critical_missing) > 0
+        needs_human_review = needs_review or needs_followup
 
         steps.append({
             "module": "Confidence_Gating",
@@ -611,16 +639,32 @@ def execute(req: ExecuteRequest):
             "module": "Human_Review_Escalation",
             "prompt": {"confidence": confidence, "critical_missing": critical_missing},
             "response": {
-                "needs_human_review": needs_review,
+                "needs_human_review": needs_human_review,
+                "needs_review": needs_review,
+                "needs_followup": needs_followup,
+                "missing_fields": critical_missing,
                 "reason": (
-                            "low_confidence"
-                            if confidence < 0.6
-                            else f"missing_fields: {critical_missing}"
-                            if len(critical_missing) > 0
-                            else "none"
-)
+                    "low_confidence"
+                    if needs_review
+                    else f"missing_fields: {critical_missing}"
+                    if needs_followup
+                    else "none"
+                ),
             }
         })
+        # --- Inject follow-up requirements into the decision text (so UI action is realistic) ---
+        if "location" in critical_missing:
+            # Prepend: ask for exact address/floor/unit
+            decision["action"] = (
+                    "FOLLOW-UP NEEDED: Obtain exact address/building name, borough, floor/unit, and nearest cross-street. "
+                    "If this is an emergency or anyone is in danger, instruct caller to call 911 immediately. "
+                    + (decision.get("action") or "")
+            )
+            # Optional: also make justification explicitly mention missing location
+            decision["justification"] = (
+                    (decision.get("justification") or "")
+                    + " (Missing required dispatch field: location/address.)"
+            )
 
         # -------- Steps trace (6) Response Generator --------
         user_friendly = format_user_response(decision)
@@ -648,15 +692,18 @@ def execute(req: ExecuteRequest):
                         "final_urgency": decision.get("urgency"),
                         "final_action": decision.get("action"),
                         "confidence": decision.get("confidence"),
-                        "escalated": needs_review,
+                        "escalated": needs_human_review,
                         "top_matches": top_matches,
                         "steps": steps,
                         "response_text": final_response,
+                        "needs_review": needs_review,
+                        "needs_followup": needs_followup,
+                        "missing_fields": critical_missing,
                     }
                 )
-                update_complaint_status(complaint_id, "needs_human" if needs_review else "processed")
-            except Exception:
-                pass
+                update_complaint_status(complaint_id, "needs_human" if needs_human_review else "processed")
+            except Exception as e:
+                print("Insert execution failed:", e)
         return payload
 
     except Exception as e:
