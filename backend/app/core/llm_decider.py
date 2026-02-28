@@ -52,7 +52,16 @@ def llm_decide(parsed: Dict[str, Any], evidence: Optional[Dict[str, Any]] = None
         "Return ONLY valid JSON (no markdown). "
         "JSON keys must be exactly: agency, urgency, action, justification, confidence. "
         "urgency must be one of: low, medium, high. "
-        "confidence must be a number between 0 and 1."
+        "confidence must be a number between 0 and 1. "
+        "IMPORTANT: If the complaint is vague, unclear, speculative, or missing key info "
+        "(like category or location), set confidence <= 0.6 and include FOLLOW-UP NEEDED "
+        "questions in the action. "
+        "Urgency must reflect immediate physical hazard only. "
+        "If the complaint is vague or lacks concrete threat details, urgency MUST be 'low'. "
+        "Do NOT set urgency to 'medium' or 'high' unless there is specific described harm, "
+        "active risk, or concrete hazard. "
+        "Only use 'high' for explicit immediate danger such as fire, gas leak, violence, "
+        "severe injury, or life-threatening conditions."
     )
 
     user = {

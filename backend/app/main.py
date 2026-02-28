@@ -554,7 +554,11 @@ def execute(req: ExecuteRequest):
         # -------- Build initial decision (rules + evidence) --------
         decision = build_dispatch_decision(parsed, draft_decision, evidence)
 
-        # Compute once and reuse
+        # 🔒 If category unknown → always route to triage
+        if parsed.get("category") in (None, "unknown"):
+            decision["agency"] = "311 Triage (Unknown)"
+
+        # -------- Compute critical missing (based on parsed) --------
         critical_missing = []
 
         if parsed.get("category") in (None, "unknown"):
@@ -564,11 +568,10 @@ def execute(req: ExecuteRequest):
                 bool(str(parsed.get("location") or "").strip()) or
                 bool(str(parsed.get("location_details") or "").strip())
         )
-
         if not has_any_location:
             critical_missing.append("location")
 
-        # -------- Optional gated LLM refinement (only when needed) --------
+        # -------- Optional gated LLM refinement --------
         confidence = float(decision.get("confidence", 0.0))
         rag_ok = isinstance(rag_result, dict) and rag_result.get("ok") is True
         rag_skipped_or_failed = not rag_ok
@@ -592,15 +595,35 @@ def execute(req: ExecuteRequest):
                         "current_decision": decision,
                         "critical_missing": critical_missing,
                     }
+
                     llm_out = llm_decide(parsed, evidence=evidence)
+
+                    # ✅ Start from LLM decision (keep rich wording)
+                    decision = llm_out
+                    # 🔒 FINAL AGENCY LOCK (after LLM)
+                    if parsed.get("category") in (None, "unknown"):
+                        decision["agency"] = "311 Triage (Unknown)"
+                    # 🔒 Lock urgency deterministically
+                    heur = estimate_urgency(
+                        parsed.get("complaint_text", ""),
+                        parsed.get("category", "unknown"),
+                        parsed.get("time_24h")
+                    )
+                    decision["urgency"] = heur
+
+                    # 🔒 Cap confidence deterministically
+                    if parsed.get("category") in (None, "unknown"):
+                        decision["confidence"] = min(decision.get("confidence", 0.0), 0.4)
+
+                    if "location" in critical_missing:
+                        decision["confidence"] = min(decision.get("confidence", 0.0), 0.4)
 
                     steps.append({
                         "module": "LLM_Disambiguation",
-                        "prompt": {"parsed": parsed, "evidence": evidence},
+                        "prompt": llm_prompt_obj,
                         "response": llm_out
                     })
 
-                    decision = llm_out
                 except Exception as e:
                     steps.append({
                         "module": "LLM_Disambiguation",
@@ -614,6 +637,24 @@ def execute(req: ExecuteRequest):
                     "response": {"skipped": True, "error": "LLM not configured"}
                 })
 
+        # --- Inject follow-up requirements into the decision text (so UI action is realistic) ---
+        if "location" in critical_missing:
+            prefix = (
+                "FOLLOW-UP NEEDED: Obtain exact address/building name, borough, floor/unit, and nearest cross-street. "
+                "If this is an emergency or anyone is in danger, instruct caller to call 911 immediately. "
+            )
+
+            action = (decision.get("action") or "").strip()
+            if not action.lower().startswith("follow-up needed"):
+                decision["action"] = prefix + action
+            elif prefix.lower() not in action.lower():
+                # Already has follow-up, but not your required fields — optionally append once.
+                decision["action"] = action + " " + prefix
+
+            just = (decision.get("justification") or "").strip()
+            if "missing required dispatch field" not in just.lower():
+                decision["justification"] = just + " (Missing required dispatch field: location/address.)"
+
         # -------- Steps trace: Decide (final decision) --------
         steps.append({
             "module": "Decide_DispatchDecision",
@@ -621,9 +662,8 @@ def execute(req: ExecuteRequest):
             "response": decision
         })
 
-        # -------- Steps trace: Confidence gating --------
+        # -------- Confidence gating --------
         confidence = float(decision.get("confidence", 0.0))
-
         passes = confidence >= 0.6
         needs_review = confidence < 0.6
         needs_followup = len(critical_missing) > 0
@@ -652,19 +692,6 @@ def execute(req: ExecuteRequest):
                 ),
             }
         })
-        # --- Inject follow-up requirements into the decision text (so UI action is realistic) ---
-        if "location" in critical_missing:
-            # Prepend: ask for exact address/floor/unit
-            decision["action"] = (
-                    "FOLLOW-UP NEEDED: Obtain exact address/building name, borough, floor/unit, and nearest cross-street. "
-                    "If this is an emergency or anyone is in danger, instruct caller to call 911 immediately. "
-                    + (decision.get("action") or "")
-            )
-            # Optional: also make justification explicitly mention missing location
-            decision["justification"] = (
-                    (decision.get("justification") or "")
-                    + " (Missing required dispatch field: location/address.)"
-            )
 
         # -------- Steps trace (6) Response Generator --------
         user_friendly = format_user_response(decision)
