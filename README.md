@@ -3,7 +3,8 @@
 Autonomous municipal complaint triage system (311-style) that converts unstructured citizen reports into structured dispatch decisions using retrieval-grounded reasoning, deterministic policy logic, and confidence-based human escalation.
 
 ## 🎬 Quick Demo
-[![Dispatch Agent Demo](./assets/demo-preview.png)](./assets/Dispatch%20Agent.mp4)
+![Dispatch Agent Demo](./assets/demo.gif)
+
 
 ## 🌟 Why Dispatch AI Agent
 
