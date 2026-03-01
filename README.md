@@ -4,7 +4,7 @@ Autonomous municipal complaint triage system (311-style) that converts unstructu
 
 ## 🎬 Demo Video
 
-![Dispatch AI Agent Demo](./assets/Dispatch%20Agent.gif)
+[![Dispatch AI Agent Demo](./assets/Dispatch%20Agent.gif)](./assets/Dispatch%20Agent.mp4)
 
 ## 🌟 Why Dispatch AI Agent
 
