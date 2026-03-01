@@ -5,7 +5,7 @@ It ingests citizen reports, retrieves similar historical cases from Pinecone, an
 The architecture combines deterministic extraction, retrieval-grounded reasoning, and optional gated LLM disambiguation for ambiguous cases.  
 Each run returns a full execution trace and can be persisted in Supabase for audit.
 
-## Why This Is an AI Agent 🧠
+## 🧠 Why This Is an AI Agent
 
 This system follows a structured reasoning pipeline inspired by ReAct (`reason -> act -> observe -> decide`), not a single prompt-response chatbot.
 
@@ -18,15 +18,17 @@ Specialized agents/modules:
 - Safety Agents (`Confidence_Gating`, `Human_Review_Escalation`) for escalation control
 - Response Agent (`Response_Generator`) for user-facing output formatting
 
-## Quick Demo 🎬
+## 🎬 Quick Demo
 
-<p>
+<p align="center">
   <a href="./assets/Dispatch%20Agent.mp4">
-    <img src="./backend/app/static/logo.png" alt="Dispatch AI Agent Demo" width="1100" />
+    <img src="./backend/app/static/logo.png" alt="Dispatch AI Agent Demo" width="1000" />
   </a>
 </p>
 
-<p><sub>Click the image to open the demo video.</sub></p>
+<p align="center"><sub>Click the preview image to open the demo video.</sub></p>
+
+Direct video link: [Dispatch Agent Demo](./assets/Dispatch%20Agent.mp4)
 
 Example complaint:
 
@@ -43,7 +45,7 @@ Output structure:
 
 The trace section can be expanded to inspect step-by-step module reasoning (`module`, `prompt`, `response`).
 
-## Problem Statement 🏙️
+## 🏙️ Problem Statement
 
 Municipal complaint triage is often manual, inconsistent, and difficult to audit.  
 Complaints arrive as unstructured text and may be incomplete, ambiguous, or urgent.
@@ -53,7 +55,7 @@ This project addresses that by:
 - grounding decisions in retrieval evidence,
 - exposing uncertainty via confidence and escalation.
 
-## Architecture 🏗️
+## 🏗️ Architecture
 
 ### System Diagram
 
@@ -97,7 +99,7 @@ Backend/frontend implementation:
 - Backend: FastAPI (`backend/app/main.py`)
 - Frontend: static HTML/CSS/JS served by FastAPI (`backend/app/static/`)
 
-## Features ✨
+## ✨ Features
 
 Implemented features only:
 - Structured complaint submission (`/api/complaints`)
@@ -110,7 +112,7 @@ Implemented features only:
 - UI visibility of decision, confidence, escalation banner, and trace steps
 - Auditability through complaint IDs, timestamps, and Supabase execution records
 
-## Example Execution Flow 🔄
+## 🔄 Example Execution Flow
 
 1. User submits complaint in UI (`POST /api/complaints`) and receives `complaint_id`.
 2. UI calls `POST /api/execute` with `complaint_id` (or direct `prompt` in quick-run mode).
@@ -135,7 +137,7 @@ Behavior:
 - Confidence gating can mark the run for escalation.
 - Human review safeguard activates instead of overconfident routing.
 
-## Design Decisions ⚙️
+## ⚙️ Design Decisions
 
 - Single-page UI:
   - chosen for fast intake-to-decision workflow in demos/grading.
@@ -148,7 +150,7 @@ Behavior:
 - Tradeoff vs multi-page workflow:
   - simpler and faster, but not a full dispatcher operations console.
 
-## Reliability and Safeguards 🛡️
+## 🛡️ Reliability and Safeguards
 
 Current safeguards:
 - strict `/api/execute` response contract (`status,error,response,steps`)
@@ -167,7 +169,7 @@ Failure handling:
 - retrieval/LLM path can fail or skip without silent success
 - escalation path remains available for uncertain decisions
 
-## Installation and Setup 🧩
+## 🧩 Installation and Setup
 
 ### 1) Clone repository
 
@@ -237,42 +239,42 @@ Access:
 - App UI: `http://127.0.0.1:8000/`
 - API docs: `http://127.0.0.1:8000/docs`
 
-## Project Structure 📂
+## 📂 Project Structure
 
 ```text
 dispatch-agent/
-├─ backend/
-│  └─ app/
-│     ├─ main.py                    # FastAPI routes and orchestration
-│     ├─ model_architecture.png     # Architecture image endpoint asset
-│     ├─ core/
-│     │  ├─ preprocessing.py        # Signal extraction, category, urgency heuristics
-│     │  ├─ rag.py                  # Embedding call + Pinecone retrieval + evidence summary
-│     │  ├─ decision.py             # Rule/policy decision logic and confidence handling
-│     │  ├─ llm_decider.py          # Gated LLM refinement
-│     │  ├─ formatting.py           # Final response formatting
-│     │  └─ supabase_client.py      # Supabase persistence access layer
-│     └─ static/
-│        ├─ index.html              # Single-page UI
-│        ├─ style.css               # UI styling
-│        ├─ app.js                  # Submission, execution, and trace rendering flow
-│        └─ logo.png
-├─ scripts/
-│  ├─ download_311_data.py
-│  ├─ clean_311_data.py
-│  ├─ embed_311_openai_compat.py
-│  ├─ pinecone_upsert.py
-│  ├─ eval_routing.py
-│  ├─ sanity_execute.py
-│  └─ supabase_schema.sql
-├─ data/
-├─ assets/
-│  └─ Dispatch Agent.mp4
-├─ .env.example
-└─ README.md
+|- backend/
+|  |- app/
+|  |  |- main.py                    # FastAPI routes and orchestration
+|  |  |- model_architecture.png     # Architecture image endpoint asset
+|  |  |- core/
+|  |  |  |- preprocessing.py        # Signal extraction, category, urgency heuristics
+|  |  |  |- rag.py                  # Embedding call + Pinecone retrieval + evidence summary
+|  |  |  |- decision.py             # Rule/policy decision logic and confidence handling
+|  |  |  |- llm_decider.py          # Gated LLM refinement
+|  |  |  |- formatting.py           # Final response formatting
+|  |  |  |- supabase_client.py      # Supabase persistence access layer
+|  |  |- static/
+|  |  |  |- index.html              # Single-page UI
+|  |  |  |- style.css               # UI styling
+|  |  |  |- app.js                  # Submission, execution, and trace rendering flow
+|  |  |  |- logo.png
+|- scripts/
+|  |- download_311_data.py
+|  |- clean_311_data.py
+|  |- embed_311_openai_compat.py
+|  |- pinecone_upsert.py
+|  |- eval_routing.py
+|  |- sanity_execute.py
+|  |- supabase_schema.sql
+|- data/
+|- assets/
+|  |- Dispatch Agent.mp4
+|- .env.example
+|- README.md
 ```
 
-## Limitations and Future Improvements 🚧
+## 🚧 Limitations and Future Improvements
 
 Current limitations:
 - no authentication/authorization
