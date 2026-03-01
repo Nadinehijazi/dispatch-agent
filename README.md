@@ -13,30 +13,14 @@ Click the image to watch the full demo.
 ### Unique Advantages
 
 - **Structured reasoning pipeline**: ReAct-style modular flow instead of a single opaque model call
-- **Retrieval-grounded decisions**: Pinecone evidence is summarized and fed into policy logic
+- **Retrieval-grounded decisions**: vector search evidence is summarized and incorporated into deterministic policy logic
 - **Operational safety controls**: confidence gating and explicit human escalation
 - **Traceability by design**: every run returns detailed `steps[]` and can be persisted for audit
 
 ## 💡 Real-World Triage Scenarios
 
-### Scenario 1: Recurring Noise Complaint
-
-**Input**: "There is a loud party with shouting at 2am every weekend."  
-**System behavior**: classifies `noise`, retrieves similar historical cases, recommends non-emergency routing.  
-**Outcome**: medium urgency + repeat-handling action.
-
-### Scenario 2: Hazard-Like Signal
-
-**Input**: "Strong gas smell near a manhole and people feel dizzy."  
-**System behavior**: classifies `safety`, applies high-risk urgency heuristics, surfaces emergency action.  
-**Outcome**: immediate escalation-oriented action.
-
-### Scenario 3: Ambiguous Odor Report
-
-**Input**: "Bad smell near my building, source unknown."  
-**System behavior**: retrieval runs, confidence may drop due to ambiguity/missing detail.  
-**Outcome**: follow-up requirements + human review safeguard.
-
+See `examples/demo_cases.md` for real captured Quick Run outputs.
+These examples were captured using the current model configuration and may vary slightly across runs.
 ## 🎯 System Features
 
 ### Intake & API
@@ -125,14 +109,14 @@ System diagram:
 
 ## 📊 System Outputs
 
-Primary decision output includes:
+Each execution returns:
 - Agency recommendation
 - Urgency level
 - Action plan
 - Confidence score
-- Escalation flag
+- Escalation flags
 
-Full execution trace includes:
+The full ReAct trace includes:
 - Module name
 - Prompt payload
 - Response payload
@@ -157,6 +141,9 @@ dispatch-agent/
 |  |  |  |- style.css
 |  |  |  |- app.js
 |  |  |  |- logo.png
+|- examples/
+|  |- demo_cases.md
+|  |- demo_cases.json
 |- scripts/
 |  |- download_311_data.py
 |  |- clean_311_data.py
@@ -246,32 +233,4 @@ Open:
 - App UI: `http://127.0.0.1:8000/`
 - API docs: `http://127.0.0.1:8000/docs`
 
-## 🛡 Reliability and Safeguards
 
-- strict endpoint response contract
-- deterministic baseline decisioning path
-- retrieval evidence scoring and summarization
-- confidence gating and explicit escalation
-- execution trace visibility and Supabase persistence
-
-Validation scripts:
-- `scripts/sanity_execute.py`
-- `scripts/eval_routing.py`
-- `scripts/check_pinecone.py` and related helpers
-
-## 🚧 Limitations and Future Improvements
-
-Current limitations:
-- no authentication/authorization
-- no dedicated multi-operator dashboard
-- no queue assignment workflow
-- no background worker for large ingestion/reindex tasks
-- dependencies not pinned in lockfile
-- limited automated test coverage
-
-Next improvements:
-- operator queue and assignment interface
-- role-based access and audit permissions
-- async task processing for ingestion/indexing
-- stronger regression/evaluation suite
-- production observability (metrics, tracing, retry policies)
