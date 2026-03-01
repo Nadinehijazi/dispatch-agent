@@ -4,13 +4,11 @@ Autonomous municipal complaint triage system (311-style) built with FastAPI, Pin
 
 ## 🎬 Quick Demo
 
-[![Dispatch AI Agent Demo](./backend/app/static/logo.png)](./assets/Dispatch%20Agent.mp4)
+Below is a short demonstration of the Dispatch AI Agent handling real complaint triage scenarios.
 
-_Click the image to open the demo video._
+[▶ Watch the Dispatch Agent Demo](./assets/Dispatch%20Agent.mp4)
 
-1. **Submit a complaint** in free text (intake form or quick-run prompt)
-2. **Run the ReAct pipeline** (preprocess → retrieve → observe → decide)
-3. **Inspect decision + trace** (agency, urgency, confidence, escalation)
+Click the link to watch the full demo.
 
 ## 🌟 Why Dispatch AI Agent
 
