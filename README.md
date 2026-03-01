@@ -1,14 +1,9 @@
 # Dispatch AI Agent
 
-Autonomous municipal complaint triage system (311-style) built with FastAPI, Pinecone retrieval, Supabase persistence, and optional gated LLM disambiguation.
+Autonomous municipal complaint triage system (311-style) that converts unstructured citizen reports into structured dispatch decisions using retrieval-grounded reasoning, deterministic policy logic, and confidence-based human escalation.
 
 ## 🎬 Quick Demo
-
-Below is a short demonstration of the Dispatch AI Agent handling real complaint triage scenarios.
-
-[▶ Watch the Dispatch Agent Demo](./assets/Dispatch%20Agent.mp4)
-
-Click the link to watch the full demo.
+[![Dispatch Agent Demo](./assets/demo-preview.png)](./assets/Dispatch%20Agent.mp4)
 
 ## 🌟 Why Dispatch AI Agent
 
@@ -127,26 +122,17 @@ System diagram:
 
 ## 📊 System Outputs
 
-Primary `/api/execute` response fields:
+Primary decision output includes:
+- Agency recommendation
+- Urgency level
+- Action plan
+- Confidence score
+- Escalation flag
 
-- `status`
-- `error`
-- `response`
-- `steps`
-
-Trace records include:
-
-- module name
-- prompt payload
-- response payload
-
-Operational outputs include:
-
-- agency recommendation
-- urgency level
-- action text
-- confidence
-- escalation flags
+Full execution trace includes:
+- Module name
+- Prompt payload
+- Response payload
 
 ## 📁 Project Structure
 
