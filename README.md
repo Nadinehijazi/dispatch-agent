@@ -1,15 +1,15 @@
-# Dispatch AI Agent 🤖
+# Dispatch AI Agent
 
 Dispatch AI Agent is a FastAPI-based autonomous triage system for municipal complaints (311-style intake).  
-It ingests citizen reports, retrieves similar historical cases from Pinecone, and produces a structured dispatch recommendation with confidence and escalation signals.  
-The architecture is interesting because it combines deterministic extraction, retrieval-grounded reasoning, and optional LLM disambiguation under gating conditions.  
-Each run returns a full execution trace and can be persisted for audit in Supabase.
+It ingests citizen reports, retrieves similar historical cases from Pinecone, and returns a structured dispatch recommendation with confidence and escalation signals.  
+The architecture combines deterministic extraction, retrieval-grounded reasoning, and optional gated LLM disambiguation for ambiguous cases.  
+Each run returns a full execution trace and can be persisted in Supabase for audit.
 
 ## Why This Is an AI Agent 🧠
 
-This system is implemented as a structured reasoning pipeline inspired by ReAct (`reason -> act -> observe -> decide`), not as a single prompt-response chatbot.
+This system follows a structured reasoning pipeline inspired by ReAct (`reason -> act -> observe -> decide`), not a single prompt-response chatbot.
 
-Operationally, the pipeline is divided into specialized agents/modules:
+Specialized agents/modules:
 - Preprocessing Agent (`Preprocessing_ContextExtraction`) for signal extraction
 - Reasoning Agent (`Reason_UnderstandComplaint`) for intent and missing-information analysis
 - Retrieval Agent (`Act_RAG_RetrieveSimilarCases`) for Pinecone search
@@ -20,31 +20,38 @@ Operationally, the pipeline is divided into specialized agents/modules:
 
 ## Quick Demo 🎬
 
+<p>
+  <a href="./assets/Dispatch%20Agent.mp4">
+    <img src="./backend/app/static/logo.png" alt="Dispatch AI Agent Demo" width="1100" />
+  </a>
+</p>
+
+<p><sub>Click the image to open the demo video.</sub></p>
+
 Example complaint:
 
 ```text
-"Water leaking from hydrant in Brooklyn."
+Water leaking from hydrant in Brooklyn.
 ```
 
-System output structure:
+Output structure:
 - Agency: `<predicted agency>`
 - Urgency: `<low|medium|high>`
-- Action: `<recommended dispatch action>`
+- Action: `<recommended action>`
 - Confidence: `<0.00-1.00>`
 - Escalation: `<true|false>`
 
-The trace panel can be expanded to inspect the full reasoning path (`module`, `prompt`, `response`) for each step.  
-A screenshot or demo GIF can be inserted here later.
+The trace section can be expanded to inspect step-by-step module reasoning (`module`, `prompt`, `response`).
 
 ## Problem Statement 🏙️
 
-Municipal complaint triage is often manual, inconsistent, and hard to audit.  
-Free-text reports may be incomplete, ambiguous, or operationally urgent.
+Municipal complaint triage is often manual, inconsistent, and difficult to audit.  
+Complaints arrive as unstructured text and may be incomplete, ambiguous, or urgent.
 
 This project addresses that by:
-- standardizing triage decisions,
-- grounding recommendations in historical retrieval evidence,
-- exposing uncertainty explicitly through confidence and escalation.
+- standardizing triage outputs,
+- grounding decisions in retrieval evidence,
+- exposing uncertainty via confidence and escalation.
 
 ## Architecture 🏗️
 
@@ -73,17 +80,18 @@ This project addresses that by:
 
 ### Component Explanation
 
-- Complaint Intake:
+- Complaint intake:
   - `POST /api/complaints` stores structured complaint data in Supabase.
 - Retrieval:
   - `backend/app/core/rag.py` embeds complaint query text and retrieves top Pinecone matches with metadata filters.
-- Reasoning and Decision:
-  - deterministic extraction and policy logic in `preprocessing.py` and `decision.py`,
-  - optional gated refinement in `llm_decider.py`.
-- Escalation:
-  - confidence gating and missing-field checks trigger human review flags.
-- Trace:
-  - full step trace is returned in `/api/execute` and persisted in Supabase execution records.
+- Reasoning and decision:
+  - deterministic logic in `backend/app/core/preprocessing.py` and `backend/app/core/decision.py`,
+  - optional gated refinement in `backend/app/core/llm_decider.py`.
+- Human escalation:
+  - `Confidence_Gating` + `Human_Review_Escalation` mark low-confidence or missing-field runs.
+- Execution trace:
+  - returned in `/api/execute` as `steps`,
+  - persisted in Supabase `executions.steps` for complaint-linked runs.
 
 Backend/frontend implementation:
 - Backend: FastAPI (`backend/app/main.py`)
@@ -92,72 +100,74 @@ Backend/frontend implementation:
 ## Features ✨
 
 Implemented features only:
-- Structured complaint intake with persisted `complaint_id`
-- Main execution endpoint with strict response contract: `status`, `error`, `response`, `steps`
+- Structured complaint submission (`/api/complaints`)
+- Main execution endpoint with strict response schema (`/api/execute`)
 - ReAct-style traceable module pipeline
-- Retrieval-Augmented Generation with Pinecone-backed evidence
-- Deterministic base decision policy with confidence scoring
-- Optional LLM disambiguation under explicit gating conditions
-- Human escalation signaling (`needs_human_review`, follow-up/missing-field context)
-- Audit visibility in UI (decision card, confidence, escalation banner, trace, recent complaints)
-- Supabase persistence for complaints and executions
+- Pinecone-based retrieval with evidence summary
+- Deterministic draft decision + confidence scoring
+- Optional LLM disambiguation under gating conditions
+- Human escalation signaling (`needs_human_review`, follow-up context)
+- UI visibility of decision, confidence, escalation banner, and trace steps
+- Auditability through complaint IDs, timestamps, and Supabase execution records
 
 ## Example Execution Flow 🔄
 
-1. User submits complaint in UI via `POST /api/complaints`.
-2. UI receives `complaint_id` and calls `POST /api/execute`.
-3. Agent runs extraction, retrieval, evidence observation, decision, and gating.
-4. API returns decision text plus complete `steps[]`.
-5. Execution metadata and trace are written to Supabase (for complaint-linked runs).
-6. If confidence is low or critical fields are missing, escalation is surfaced in trace and UI.
+1. User submits complaint in UI (`POST /api/complaints`) and receives `complaint_id`.
+2. UI calls `POST /api/execute` with `complaint_id` (or direct `prompt` in quick-run mode).
+3. Agent runs preprocessing, retrieval, evidence observation, decision, and gating.
+4. API returns:
+   - `response` (human-readable dispatch output)
+   - `steps` (full module-level trace)
+5. For complaint-linked runs, execution metadata and trace are stored in Supabase.
+6. If confidence is low or required fields are missing, escalation flags are set and surfaced in UI.
 
 ### Concrete Scenario: Ambiguous Complaint
 
 Input:
 
 ```text
-"There’s a bad smell near my building."
+There is a bad smell near my building.
 ```
 
 Behavior:
-- Retrieval is still triggered to look for similar historical patterns.
-- Evidence may be weak or conflicting, so confidence can drop.
+- Retrieval is triggered to search similar historical cases.
+- Evidence may be weak/conflicting, reducing confidence.
 - Confidence gating can mark the run for escalation.
-- Human review safeguard activates, preventing silent overconfident routing.
+- Human review safeguard activates instead of overconfident routing.
 
 ## Design Decisions ⚙️
 
 - Single-page UI:
-  - chosen to keep intake-to-decision interaction fast for demo, grading, and operator review.
+  - chosen for fast intake-to-decision workflow in demos/grading.
 - Collapsed trace by default:
-  - preserves clarity for non-technical users while keeping technical transparency one click away.
+  - keeps UI readable while preserving transparency.
 - Explicit escalation banner:
-  - makes uncertain outcomes operationally visible and actionable.
+  - makes uncertain outcomes visible and actionable.
 - Complaint-linked execution persistence:
-  - keeps decision, trace, and escalation context auditable per complaint.
+  - keeps decision + trace auditable per complaint.
 - Tradeoff vs multi-page workflow:
-  - simpler and faster to operate, but not yet a full dispatcher operations console.
+  - simpler and faster, but not a full dispatcher operations console.
 
-## Reliability & Safeguards 🛡️
+## Reliability and Safeguards 🛡️
 
 Current safeguards:
-- strict `/api/execute` schema contract
-- deterministic base path (preprocessing + policy) even if optional services are unavailable
-- retrieval evidence summarization (`agency_counts`, `top_score`, `total_matches`)
+- strict `/api/execute` response contract (`status,error,response,steps`)
+- deterministic base path (preprocessing + policy)
+- retrieval evidence signals (`agency_counts`, `top_score`, `total_matches`)
 - confidence gating + explicit human escalation
-- traceability in API response and persisted Supabase execution record
+- Supabase persistence for audit
 
-Validation scripts included:
+Validation scripts:
 - `scripts/sanity_execute.py` for API contract checks
-- `scripts/eval_routing.py` for retrieval/routing sanity evaluation
-- `scripts/check_pinecone.py` and related utilities for vector DB validation
+- `scripts/eval_routing.py` for retrieval/routing sanity checks
+- `scripts/check_pinecone.py` and related scripts for vector DB verification
 
 Failure handling:
-- endpoint-level error mode (`status="error"` with readable error message)
-- retrieval/LLM path can be skipped or errored without silent success
-- escalation path remains available for uncertain outputs
+- endpoint-level error mode (`status="error"` with readable `error`)
+- retrieval/LLM path can fail or skip without silent success
+- escalation path remains available for uncertain decisions
 
-## Installation & Setup 🧩
+## Installation and Setup 🧩
 
 ### 1) Clone repository
 
@@ -177,7 +187,7 @@ backend\.venv\Scripts\Activate.ps1
 
 ### 3) Install dependencies
 
-If your branch does not include a pinned requirements file, install the packages used by the code:
+If your branch does not include a pinned requirements file, install packages used by code:
 
 ```powershell
 pip install fastapi uvicorn pydantic requests pandas openai pinecone python-dotenv certifi
@@ -211,13 +221,13 @@ SUPABASE_EXECUTIONS_TABLE=executions
 
 ### 5) Create Supabase schema
 
-Execute:
+Run:
 
 ```text
 scripts/supabase_schema.sql
 ```
 
-### 6) Run FastAPI locally
+### 6) Start FastAPI locally
 
 ```powershell
 backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload
@@ -234,9 +244,9 @@ dispatch-agent/
 ├─ backend/
 │  └─ app/
 │     ├─ main.py                    # FastAPI routes and orchestration
-│     ├─ model_architecture.png     # Architecture image served by endpoint
+│     ├─ model_architecture.png     # Architecture image endpoint asset
 │     ├─ core/
-│     │  ├─ preprocessing.py        # Signal extraction, categorization, urgency heuristics
+│     │  ├─ preprocessing.py        # Signal extraction, category, urgency heuristics
 │     │  ├─ rag.py                  # Embedding call + Pinecone retrieval + evidence summary
 │     │  ├─ decision.py             # Rule/policy decision logic and confidence handling
 │     │  ├─ llm_decider.py          # Gated LLM refinement
@@ -244,7 +254,7 @@ dispatch-agent/
 │     │  └─ supabase_client.py      # Supabase persistence access layer
 │     └─ static/
 │        ├─ index.html              # Single-page UI
-│        ├─ style.css               # UI styles
+│        ├─ style.css               # UI styling
 │        ├─ app.js                  # Submission, execution, and trace rendering flow
 │        └─ logo.png
 ├─ scripts/
@@ -256,23 +266,25 @@ dispatch-agent/
 │  ├─ sanity_execute.py
 │  └─ supabase_schema.sql
 ├─ data/
+├─ assets/
+│  └─ Dispatch Agent.mp4
 ├─ .env.example
 └─ README.md
 ```
 
-## Limitations & Future Improvements 🚧
+## Limitations and Future Improvements 🚧
 
 Current limitations:
 - no authentication/authorization
 - no dedicated multi-operator dashboard
-- no queueing/assignment workflow
+- no queue/assignment workflow
 - no background worker for heavy ingestion/reindex tasks
-- dependency installation is not pinned in a lockfile
+- dependencies not pinned in lockfile/requirements
 - limited automated test coverage
 
-Realistic next improvements:
+Next improvements:
 - operator queue and assignment UI
 - role-based access and audit permissions
 - background task processing for ingestion and indexing
-- expanded regression suite for decision and retrieval quality
-- production observability (metrics, tracing, retry policies)
+- expanded regression suite for retrieval and decision quality
+- production observability (metrics, tracing, retries)
