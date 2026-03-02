@@ -72,7 +72,7 @@ CATEGORY_KEYWORDS = {
 
 AGENCY_MAP = {
     "noise": "Noise Control / Non-emergency Police",
-    "sanitation": "Sanitation Department",
+    "sanitation": "DSNY",
     "parking": "Parking Enforcement",
     "street": "Public Works / DOT",
     "water": "Water & Sewer Department",

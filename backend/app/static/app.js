@@ -74,12 +74,31 @@ function prettyJson(obj) {
   }
 }
 
+function parseDecisionText(responseText) {
+  const text = String(responseText || "");
+  const extract = (label) => {
+    const match = text.match(new RegExp(`- ${label}: ([\\s\\S]*?)(?=\\n- [A-Za-z ]+:|$)`));
+    return match ? match[1].trim() : null;
+  };
+
+  const confidenceRaw = extract("Confidence");
+  const confidence = confidenceRaw !== null ? Number(confidenceRaw) : null;
+
+  return {
+    agency: extract("Agency"),
+    urgency: extract("Urgency"),
+    action: extract("Action"),
+    justification: extract("Justification"),
+    confidence: Number.isFinite(confidence) ? confidence : null,
+  };
+}
+
 function renderTraceSteps(steps) {
   const arr = Array.isArray(steps) ? steps : [];
 
   if (!traceWrap) return;
   if (arr.length === 0) {
-    traceWrap.innerHTML = `<p class="status">No steps.</p>`;
+    traceWrap.innerHTML = `<p class="status">No LLM steps were used.</p>`;
     return;
   }
 
@@ -134,6 +153,7 @@ function resetDecision() {
   confidenceFill.style.width = "0%";
   confidenceLabel.textContent = "-";
   reviewBanner.style.display = "none";
+  reviewBanner.textContent = "";
   if (traceWrap) traceWrap.innerHTML = `<p class="status">-</p>`;
   if (rawOutput) rawOutput.textContent = "-";
   if (copyStatus) copyStatus.textContent = "";
@@ -159,21 +179,13 @@ async function loadHistory() {
   }
 }
 
-function showBanner(text) {
-  reviewBanner.textContent = text;
-  reviewBanner.style.display = "flex";
-}
-
 function renderDecision(execData) {
   renderTraceSteps(execData.steps);
   if (rawOutput) rawOutput.textContent = prettyJson(execData);
 
-  const decisionStep = (execData.steps || []).find(
-    (s) => s.module === "Decide_DispatchDecision"
-  );
-  const decision = decisionStep ? decisionStep.response : null;
+  const decision = parseDecisionText(execData.response);
 
-  if (decision) {
+  if (decision && (decision.agency || decision.urgency || decision.action || decision.justification)) {
     agencyChip.textContent = `Agency: ${decision.agency || "-"}`;
     updateUrgency(decision.urgency);
     actionText.textContent = decision.action || "-";
@@ -184,30 +196,24 @@ function renderDecision(execData) {
     confidenceLabel.textContent = `Confidence: ${(confidence * 100).toFixed(0)}%`;
   }
 
-  // ✅ Banner logic (read from Human_Review_Escalation step, not top-level)
-  const reviewStep = (execData.steps || []).find(
-    (s) => s.module === "Human_Review_Escalation"
-  );
-  const review = reviewStep ? (reviewStep.response || {}) : {};
-
-  const needsHumanReview = !!review.needs_human_review;
-  const needsFollowup = !!review.needs_followup;
-  const needsReview = !!review.needs_review;
-  const missing = Array.isArray(review.missing_fields) ? review.missing_fields : [];
+  const confidence = Number(decision.confidence || 0);
+  const justification = String(decision.justification || "").toLowerCase();
+  const action = String(decision.action || "").toLowerCase();
+  const needsFollowup =
+    action.includes("request exact address") ||
+    justification.includes("missing required dispatch field: location/address");
+  const needsHumanReview = needsFollowup || confidence < 0.6;
 
   if (needsHumanReview) {
     reviewBanner.style.display = "flex";
-    if (needsFollowup) {
-      reviewBanner.textContent = `Follow-up required: missing ${missing.join(", ") || "required fields"}.`;
-    } else if (needsReview) {
-      reviewBanner.textContent = "Human review recommended: low confidence.";
-    } else {
-      reviewBanner.textContent = review.reason || "Human review recommended.";
-    }
+    reviewBanner.textContent = needsFollowup
+      ? "Follow-up required: missing dispatch location details."
+      : "Human review recommended: low confidence.";
   } else {
     reviewBanner.style.display = "none";
     reviewBanner.textContent = "";
   }
+
   if (copyFinalBtn) {
     copyFinalBtn.onclick = async () => {
       try {
@@ -250,10 +256,13 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  // Optional: require location_details too
-  // (recommended for true dispatch tickets; borough alone might be insufficient)
   if (!payload.location_details || payload.location_details.trim().length < 3) {
     showError("Location details (address / landmark) are required to submit a complaint.");
+    return;
+  }
+
+  if (!payload.consent) {
+    showError("Consent is required to submit a complaint.");
     return;
   }
 

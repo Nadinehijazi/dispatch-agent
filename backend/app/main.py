@@ -54,7 +54,7 @@ def agent_info():
         ),
         "purpose": (
             "Assist human dispatchers by standardizing triage decisions with evidence from similar historical cases. "
-            "The agent recommends agency and urgency, provides a full pipeline trace, and escalates or asks for follow-up when uncertain."
+            "The agent recommends agency and urgency, and uses a gated LLM refinement step only when confidence is low or critical information is missing."
         ),
         "modules": [
             "Preprocessing_ContextExtraction",
@@ -68,8 +68,8 @@ def agent_info():
             "Response_Generator",
         ],
         "steps_semantics": (
-            "The steps array logs the full execution pipeline in order. "
-            "Most steps are deterministic or retrieval-based; LLM_Disambiguation appears only when confidence is low or critical fields are missing."
+            "The steps array includes actual LLM calls only. "
+            "In this agent, LLM_Disambiguation appears only when confidence is low or critical fields are missing; deterministic and retrieval steps are not included in steps."
         ),
         "prompt_template": {
             "template": (
@@ -92,279 +92,7 @@ def agent_info():
                     "- Justification: time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62\n"
                     "- Confidence: 0.85\n"
                 ),
-                "steps": [
-                    {
-                        "module": "Preprocessing_ContextExtraction",
-                        "prompt": {
-                            "input_prompt": "loud party at 2am in Brooklyn, recurring every weekend."
-                        },
-                        "response": {
-                            "extracted": {
-                                "category": "noise",
-                                "location": "Brooklyn",
-                                "borough": "BROOKLYN",
-                                "time_24h": "02:00",
-                                "recurrence": "every weekend",
-                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
-                            }
-                        },
-                    },
-                    {
-                        "module": "Reason_UnderstandComplaint",
-                        "prompt": {
-                            "parsed": {
-                                "category": "noise",
-                                "location": "Brooklyn",
-                                "borough": "BROOKLYN",
-                                "time_24h": "02:00",
-                                "recurrence": "every weekend",
-                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
-                            }
-                        },
-                        "response": {
-                            "intent": "Handle a noise complaint",
-                            "constraints": ["recurring issue"],
-                            "missing_info": [],
-                        },
-                    },
-                    {
-                        "module": "Act_RAG_RetrieveSimilarCases",
-                        "prompt": {
-                            "parsed": {
-                                "category": "noise",
-                                "location": "Brooklyn",
-                                "borough": "BROOKLYN",
-                                "time_24h": "02:00",
-                                "recurrence": "every weekend",
-                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
-                            },
-                            "top_k": 3,
-                        },
-                        "response": {
-                            "cases": [
-                                {
-                                    "id": "67615984",
-                                    "score": 0.620864928,
-                                    "metadata": {
-                                        "agency": "NYPD",
-                                        "borough": "BROOKLYN",
-                                        "complaint_type": "Noise - Residential",
-                                        "created_date": "2026-01-26T00:13:20.000",
-                                        "descriptor": "Loud Music/Party",
-                                        "open_data_channel_type": "ONLINE",
-                                        "status": "Closed",
-                                    },
-                                },
-                                {
-                                    "id": "67611519",
-                                    "score": 0.620864928,
-                                    "metadata": {
-                                        "agency": "NYPD",
-                                        "borough": "BROOKLYN",
-                                        "complaint_type": "Noise - Residential",
-                                        "created_date": "2026-01-26T00:17:23.000",
-                                        "descriptor": "Loud Music/Party",
-                                        "open_data_channel_type": "ONLINE",
-                                        "status": "Closed",
-                                    },
-                                },
-                                {
-                                    "id": "67605642",
-                                    "score": 0.620768607,
-                                    "metadata": {
-                                        "agency": "NYPD",
-                                        "agency_name": "New York City Police Department",
-                                        "borough": "BROOKLYN",
-                                        "complaint_text": "Noise - Residential | Loud Music/Party | Residential Building/House | BROOKLYN",
-                                        "complaint_type": "Noise - Residential",
-                                        "created_date": "2026-01-25T18:36:35.000",
-                                        "descriptor": "Loud Music/Party",
-                                        "location_type": "Residential Building/House",
-                                        "open_data_channel_type": "MOBILE",
-                                        "status": "Closed",
-                                    },
-                                },
-                            ]
-                        },
-                    },
-                    {
-                        "module": "Observe_SummarizeEvidence",
-                        "prompt": {
-                            "cases": [
-                                {
-                                    "id": "67615984",
-                                    "score": 0.620864928,
-                                    "metadata": {
-                                        "agency": "NYPD",
-                                        "borough": "BROOKLYN",
-                                        "complaint_type": "Noise - Residential",
-                                        "created_date": "2026-01-26T00:13:20.000",
-                                        "descriptor": "Loud Music/Party",
-                                        "open_data_channel_type": "ONLINE",
-                                        "status": "Closed",
-                                    },
-                                },
-                                {
-                                    "id": "67611519",
-                                    "score": 0.620864928,
-                                    "metadata": {
-                                        "agency": "NYPD",
-                                        "borough": "BROOKLYN",
-                                        "complaint_type": "Noise - Residential",
-                                        "created_date": "2026-01-26T00:17:23.000",
-                                        "descriptor": "Loud Music/Party",
-                                        "open_data_channel_type": "ONLINE",
-                                        "status": "Closed",
-                                    },
-                                },
-                                {
-                                    "id": "67605642",
-                                    "score": 0.620768607,
-                                    "metadata": {
-                                        "agency": "NYPD",
-                                        "agency_name": "New York City Police Department",
-                                        "borough": "BROOKLYN",
-                                        "complaint_text": "Noise - Residential | Loud Music/Party | Residential Building/House | BROOKLYN",
-                                        "complaint_type": "Noise - Residential",
-                                        "created_date": "2026-01-25T18:36:35.000",
-                                        "descriptor": "Loud Music/Party",
-                                        "location_type": "Residential Building/House",
-                                        "open_data_channel_type": "MOBILE",
-                                        "status": "Closed",
-                                    },
-                                },
-                            ]
-                        },
-                        "response": {
-                            "top_cases": [
-                                {
-                                    "id": "67615984",
-                                    "score": 0.620864928,
-                                    "agency": "NYPD",
-                                    "complaint_type": "Noise - Residential",
-                                    "descriptor": "Loud Music/Party",
-                                    "status": "Closed",
-                                    "created_date": "2026-01-26T00:13:20.000",
-                                },
-                                {
-                                    "id": "67611519",
-                                    "score": 0.620864928,
-                                    "agency": "NYPD",
-                                    "complaint_type": "Noise - Residential",
-                                    "descriptor": "Loud Music/Party",
-                                    "status": "Closed",
-                                    "created_date": "2026-01-26T00:17:23.000",
-                                },
-                                {
-                                    "id": "67605642",
-                                    "score": 0.620768607,
-                                    "agency": "NYPD",
-                                    "complaint_type": "Noise - Residential",
-                                    "descriptor": "Loud Music/Party",
-                                    "status": "Closed",
-                                    "created_date": "2026-01-25T18:36:35.000",
-                                },
-                            ],
-                            "evidence_summary": "Retrieved similar historical cases from Pinecone. Top agencies: NYPD.",
-                            "agency_counts": {"NYPD": 3},
-                            "total_matches": 3,
-                            "top_score": 0.620864928,
-                        },
-                    },
-                    {
-                        "module": "Decide_DispatchDecision",
-                        "prompt": {
-                            "parsed": {
-                                "category": "noise",
-                                "location": "Brooklyn",
-                                "borough": "BROOKLYN",
-                                "time_24h": "02:00",
-                                "recurrence": "every weekend",
-                                "complaint_text": "loud party at 2am in Brooklyn, recurring every weekend.",
-                            },
-                            "draft_decision": {
-                                "agency_guess": "NYPD",
-                                "urgency_guess": "medium",
-                                "action_guess": "Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated",
-                                "confidence_stub": 0.55,
-                            },
-                            "evidence": {
-                                "top_cases": [
-                                    {
-                                        "id": "67615984",
-                                        "score": 0.620864928,
-                                        "agency": "NYPD",
-                                        "complaint_type": "Noise - Residential",
-                                        "descriptor": "Loud Music/Party",
-                                        "status": "Closed",
-                                        "created_date": "2026-01-26T00:13:20.000",
-                                    },
-                                    {
-                                        "id": "67611519",
-                                        "score": 0.620864928,
-                                        "agency": "NYPD",
-                                        "complaint_type": "Noise - Residential",
-                                        "descriptor": "Loud Music/Party",
-                                        "status": "Closed",
-                                        "created_date": "2026-01-26T00:17:23.000",
-                                    },
-                                    {
-                                        "id": "67605642",
-                                        "score": 0.620768607,
-                                        "agency": "NYPD",
-                                        "complaint_type": "Noise - Residential",
-                                        "descriptor": "Loud Music/Party",
-                                        "status": "Closed",
-                                        "created_date": "2026-01-25T18:36:35.000",
-                                    },
-                                ],
-                                "evidence_summary": "Retrieved similar historical cases from Pinecone. Top agencies: NYPD.",
-                                "agency_counts": {"NYPD": 3},
-                                "total_matches": 3,
-                                "top_score": 0.620864928,
-                            },
-                        },
-                        "response": {
-                            "agency": "NYPD",
-                            "urgency": "medium",
-                            "action": "Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated",
-                            "justification": "time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62",
-                            "confidence": 0.85,
-                        },
-                    },
-                    {
-                        "module": "Confidence_Gating",
-                        "prompt": {"confidence": 0.85, "threshold": 0.6, "critical_missing": []},
-                        "response": {"passes": True},
-                    },
-                    {
-                        "module": "Human_Review_Escalation",
-                        "prompt": {"confidence": 0.85, "critical_missing": []},
-                        "response": {"needs_human_review": False, "reason": "none"},
-                    },
-                    {
-                        "module": "Response_Generator",
-                        "prompt": {
-                            "decision": {
-                                "agency": "NYPD",
-                                "urgency": "medium",
-                                "action": "Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated",
-                                "justification": "time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62",
-                                "confidence": 0.85,
-                            }
-                        },
-                        "response": {
-                            "text": (
-                                "Decision:\n"
-                                "- Agency: NYPD\n"
-                                "- Urgency: medium\n"
-                                "- Action: Create noise complaint ticket; advise caller; dispatch non-emergency check if repeated\n"
-                                "- Justification: time=02:00, recurrence=every weekend, location=Brooklyn, category=noise, evidence_top_agency=NYPD, evidence_vote_ratio=1.00, evidence_top_score=0.62\n"
-                                "- Confidence: 0.85\n"
-                            )
-                        },
-                    },
-                ],
+                "steps": [],
             }
         ],
     }
@@ -415,6 +143,9 @@ def create_complaint(payload: ComplaintCreate):
         # ✅ NEW CHECK: Location details required
         if not payload.location_details or not payload.location_details.strip():
             return {"status": "error", "error": "location_details is required", "complaint_id": None}
+
+        if payload.consent is not True:
+            return {"status": "error", "error": "consent is required", "complaint_id": None}
 
         complaint_id = insert_complaint(
             {
@@ -535,50 +266,18 @@ def execute(req: ExecuteRequest):
             "confidence_stub": 0.35 if category == "unknown" else 0.55,
         }
 
-        # -------- Steps trace (1) Preprocessing --------
-        steps.append({
-            "module": "Preprocessing_ContextExtraction",
-            "prompt": {"input_prompt": prompt_text},
-            "response": {"extracted": parsed}
-        })
-
-        # -------- Steps trace (2) Reason --------
         reasoning = build_reasoning(parsed)
-        steps.append({
-            "module": "Reason_UnderstandComplaint",
-            "prompt": {"parsed": parsed},
-            "response": reasoning
-        })
-        # -------- Steps trace (3) Act: RAG retrieve --------
+
         rag_result = retrieve_similar_cases(parsed, top_k=3)
-        steps.append({
-            "module": "Act_RAG_RetrieveSimilarCases",
-            "prompt": {"parsed": parsed, "top_k": 3},
-            "response": rag_result
-        })
         cases = rag_result.get("cases", []) if isinstance(rag_result, dict) else []
 
-        # -------- Steps trace (4) Observe: summarize evidence --------
         evidence = summarize_evidence(cases)
-        steps.append({
-            "module": "Observe_SummarizeEvidence",
-            "prompt": {"cases": cases},
-            "response": evidence
-        })
 
-        # -------- Build initial decision (rules + evidence) --------
         decision = build_dispatch_decision(parsed, draft_decision, evidence)
 
-        # Unknown category always routes to triage.
         if parsed.get("category") in (None, "unknown"):
             decision["agency"] = "311 Triage (Unknown)"
 
-        # -------- Steps trace: rule-based decision --------
-        steps.append({
-            "module": "Decide_DispatchDecision",
-            "prompt": {"parsed": parsed, "draft_decision": draft_decision, "evidence": evidence},
-            "response": decision.copy()
-        })
         # -------- Compute critical missing (based on parsed) --------
         critical_missing = []
 
@@ -651,13 +350,6 @@ def execute(req: ExecuteRequest):
                         "prompt": {"parsed": parsed, "critical_missing": critical_missing},
                         "response": {"skipped": False, "error": str(e)}
                     })
-            else:
-                steps.append({
-                    "module": "LLM_Disambiguation",
-                    "prompt": {"parsed": parsed, "critical_missing": critical_missing},
-                    "response": {"skipped": True, "error": "LLM not configured"}
-                })
-        # --- Keep missing-location follow-up concise and operational ---
         if "location" in critical_missing:
             decision["action"] = (
                 "Request exact address or nearest cross-street and borough, then route to DSNY for inspection/cleanup; "
@@ -675,37 +367,7 @@ def execute(req: ExecuteRequest):
         needs_followup = len(critical_missing) > 0
         needs_human_review = needs_review or needs_followup
 
-        steps.append({
-            "module": "Confidence_Gating",
-            "prompt": {"confidence": confidence, "threshold": 0.6, "critical_missing": critical_missing},
-            "response": {"passes": passes}
-        })
-
-        steps.append({
-            "module": "Human_Review_Escalation",
-            "prompt": {"confidence": confidence, "critical_missing": critical_missing},
-            "response": {
-                "needs_human_review": needs_human_review,
-                "needs_review": needs_review,
-                "needs_followup": needs_followup,
-                "missing_fields": critical_missing,
-                "reason": (
-                    "low_confidence"
-                    if needs_review
-                    else f"missing_fields: {critical_missing}"
-                    if needs_followup
-                    else "none"
-                ),
-            }
-        })
-
-        # -------- Steps trace (6) Response Generator --------
         user_friendly = format_user_response(decision)
-        steps.append({
-            "module": "Response_Generator",
-            "prompt": {"decision": decision},
-            "response": {"text": user_friendly}
-        })
 
         final_response = user_friendly
 
