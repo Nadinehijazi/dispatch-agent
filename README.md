@@ -1,6 +1,6 @@
 # Dispatch AI Agent
 
-Autonomous municipal complaint triage system (311-style) that converts unstructured citizen reports into structured dispatch decisions using retrieval-grounded reasoning, deterministic policy logic, and confidence-based human escalation.
+Autonomous 311-style municipal complaint triage agent designed to replace manual decision workflows by making real-time, auditable operational decisions (agency routing, urgency, and action planning) from unstructured citizen reports using retrieval-grounded reasoning, deterministic policy logic, and confidence-based human escalation.
 
 ## 🎬 Demo Video
 
@@ -173,7 +173,7 @@ dispatch-agent/
 1. Clone repository:
 
 ```bash
-git clone https://github.com/<your-user>/dispatch-agent.git
+git clone https://github.com/Nadinehijazi/dispatch-agent.git
 cd dispatch-agent
 ```
 
