@@ -54,7 +54,22 @@ def agent_info():
         ),
         "purpose": (
             "Assist human dispatchers by standardizing triage decisions with evidence from similar historical cases. "
-            "The agent recommends agency and urgency, provides transparent steps, and escalates when uncertain."
+            "The agent recommends agency and urgency, provides a full pipeline trace, and escalates or asks for follow-up when uncertain."
+        ),
+        "modules": [
+            "Preprocessing_ContextExtraction",
+            "Reason_UnderstandComplaint",
+            "Act_RAG_RetrieveSimilarCases",
+            "Observe_SummarizeEvidence",
+            "Decide_DispatchDecision",
+            "LLM_Disambiguation",
+            "Confidence_Gating",
+            "Human_Review_Escalation",
+            "Response_Generator",
+        ],
+        "steps_semantics": (
+            "The steps array logs the full execution pipeline in order. "
+            "Most steps are deterministic or retrieval-based; LLM_Disambiguation appears only when confidence is low or critical fields are missing."
         ),
         "prompt_template": {
             "template": (
@@ -432,7 +447,7 @@ def execute(req: ExecuteRequest):
     """
     Course requirement:
     - Top-level response fields MUST be exactly: status, error, response, steps
-    - steps[] MUST describe every LLM call in order (module + prompt + response)
+    - steps[] logs the full pipeline in order (module + prompt + response)
     “We use gated LLM calls only when confidence is low or critical info is missing, to minimize cost.”
     """
     try:
@@ -554,10 +569,16 @@ def execute(req: ExecuteRequest):
         # -------- Build initial decision (rules + evidence) --------
         decision = build_dispatch_decision(parsed, draft_decision, evidence)
 
-        # 🔒 If category unknown → always route to triage
+        # Unknown category always routes to triage.
         if parsed.get("category") in (None, "unknown"):
             decision["agency"] = "311 Triage (Unknown)"
 
+        # -------- Steps trace: rule-based decision --------
+        steps.append({
+            "module": "Decide_DispatchDecision",
+            "prompt": {"parsed": parsed, "draft_decision": draft_decision, "evidence": evidence},
+            "response": decision.copy()
+        })
         # -------- Compute critical missing (based on parsed) --------
         critical_missing = []
 
@@ -598,7 +619,7 @@ def execute(req: ExecuteRequest):
 
                     llm_out = llm_decide(parsed, evidence=evidence)
 
-                    # ✅ Start from LLM decision (keep rich wording)
+                    # Final decision is refined only in this gated LLM step.
                     decision = llm_out
                     # 🔒 FINAL AGENCY LOCK (after LLM)
                     if parsed.get("category") in (None, "unknown"):
@@ -636,31 +657,16 @@ def execute(req: ExecuteRequest):
                     "prompt": {"parsed": parsed, "critical_missing": critical_missing},
                     "response": {"skipped": True, "error": "LLM not configured"}
                 })
-
-        # --- Inject follow-up requirements into the decision text (so UI action is realistic) ---
+        # --- Keep missing-location follow-up concise and operational ---
         if "location" in critical_missing:
-            prefix = (
-                "FOLLOW-UP NEEDED: Obtain exact address/building name, borough, floor/unit, and nearest cross-street. "
-                "If this is an emergency or anyone is in danger, instruct caller to call 911 immediately. "
+            decision["action"] = (
+                "Request exact address or nearest cross-street and borough, then route to DSNY for inspection/cleanup; "
+                "escalate to DOHMH only if pests, persistent odor, or hazardous waste are reported."
             )
-
-            action = (decision.get("action") or "").strip()
-            if not action.lower().startswith("follow-up needed"):
-                decision["action"] = prefix + action
-            elif prefix.lower() not in action.lower():
-                # Already has follow-up, but not your required fields — optionally append once.
-                decision["action"] = action + " " + prefix
 
             just = (decision.get("justification") or "").strip()
             if "missing required dispatch field" not in just.lower():
                 decision["justification"] = just + " (Missing required dispatch field: location/address.)"
-
-        # -------- Steps trace: Decide (final decision) --------
-        steps.append({
-            "module": "Decide_DispatchDecision",
-            "prompt": {"parsed": parsed, "draft_decision": draft_decision, "evidence": evidence},
-            "response": decision
-        })
 
         # -------- Confidence gating --------
         confidence = float(decision.get("confidence", 0.0))
@@ -748,3 +754,8 @@ def ui():
     html_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return f.read()
+
+
+
+
+
