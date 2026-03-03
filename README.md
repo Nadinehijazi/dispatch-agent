@@ -5,8 +5,8 @@ Autonomous 311-style municipal complaint triage agent designed to replace manual
 ## 🎬 Quick Demo
 
 <p align="center">
-  <a href="./assets/Dispatch%20Agent.mp4">
-    <img src="./assets/Quick Demo.gif" width="900" alt="Dispatch AI Agent Demo"/>
+  <a href="./assets/Quick%20Demo.mp4">
+    <img src="./assets/Quick%20Demo.gif" width="900" alt="Dispatch AI Agent Demo"/>
   </a>
 </p>
 
