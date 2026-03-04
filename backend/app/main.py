@@ -29,8 +29,8 @@ from .core.supabase_client import (
 )
 
 app = FastAPI(title="Dispatch AI Agent")
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+static_dir = os.path.join(os.path.dirname(__file__), "../../static")
+app.mount("../../static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/api/team_info")
 def team_info():
@@ -413,7 +413,7 @@ def execute(req: ExecuteRequest):
 
 @app.get("/", response_class=HTMLResponse)
 def ui():
-    html_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    html_path = os.path.join(os.path.dirname(__file__), "../../static", "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return f.read()
 
