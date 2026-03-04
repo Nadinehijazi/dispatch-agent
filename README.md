@@ -2,10 +2,17 @@
 
 Autonomous 311-style municipal complaint triage agent designed to replace manual decision workflows by making real-time, auditable operational decisions (agency routing, urgency, and action planning) from unstructured citizen reports using retrieval-grounded reasoning, deterministic policy logic, and confidence-based human escalation.
 
-## 🎬 Demo Video
+## 🎬 Quick Demo
 
-[![Dispatch AI Agent Demo](./backend/app/static/logo.png)](./assets/Quick%20Demo.mp4)
+<p align="center">
+  <a href="./assets/quick_demo.mp4">
+    <img src="./assets/quick_demo.gif" width="900" alt="Dispatch AI Agent Demo"/>
+  </a>
+</p>
 
+<p align="center">
+  Click the preview above to watch the full demo video.
+</p>
 
 ## 🌟 Why Dispatch AI Agent
 
