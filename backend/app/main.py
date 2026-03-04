@@ -32,7 +32,7 @@ app = FastAPI(title="Dispatch AI Agent")
 static_dir = os.path.join(os.path.dirname(__file__), "../../static")
 app.mount("../../static", StaticFiles(directory=static_dir), name="static")
 
-@app.get("/api/team_info")
+@app.get("/team_info")
 def team_info():
     return {
         "group_batch_order_number": "Batch2_10",
@@ -45,7 +45,7 @@ def team_info():
     }
 
 
-@app.get("/api/agent_info")
+@app.get("/agent_info")
 def agent_info():
     return {
         "description": (
@@ -97,7 +97,7 @@ def agent_info():
         ],
     }
 
-@app.get("/api/model_architecture")
+@app.get("/model_architecture")
 def model_architecture():
     png_path = os.path.join(os.path.dirname(__file__), "model_architecture.png")
     if not os.path.exists(png_path):
@@ -127,7 +127,7 @@ class Step(BaseModel):
     response: Dict[str, Any]
 
 
-@app.post("/api/complaints")
+@app.post("/complaints")
 def create_complaint(payload: ComplaintCreate):
     try:
         if not payload.full_name or not payload.full_name.strip():
@@ -166,14 +166,14 @@ def create_complaint(payload: ComplaintCreate):
     except Exception as e:
         return {"status": "error", "error": f"Supabase insert failed: {str(e)}", "complaint_id": None}
 
-@app.get("/api/complaints_recent")
+@app.get("/complaints_recent")
 def complaints_recent():
     try:
         return {"status": "ok", "error": None, "items": list_recent_complaints(10)}
     except Exception as e:
         return {"status": "error", "error": f"Supabase fetch failed: {str(e)}", "items": []}
 
-@app.post("/api/execute")
+@app.post("/execute")
 def execute(req: ExecuteRequest):
     """
     Course requirement:
