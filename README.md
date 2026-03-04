@@ -16,7 +16,8 @@ Full HD demo video: [assets/demo.mp4](./assets/quick_demo.mp4)
 - **Structured reasoning pipeline**: ReAct-style modular flow instead of a single opaque model call
 - **Retrieval-grounded decisions**: vector search evidence is summarized and incorporated into deterministic policy logic
 - **Operational safety controls**: confidence gating and explicit human escalation
-- **Traceability by design**: every run returns detailed `steps[]` and can be persisted for audit
+- **Traceability by design**: every run returns `steps[]` entries for actual LLM calls and can be persisted for audit
+
 
 ## 💡 Real-World Triage Scenarios
 
@@ -40,7 +41,7 @@ These examples were captured using the current model configuration and may vary 
 - Deterministic policy decision with confidence scoring
 - Optional gated LLM disambiguation (`llm_decider.py`)
 - Confidence gating and human escalation (`needs_human_review`, follow-up signals)
-
+  
 ### UI & Auditability
 
 - Single-page UI for intake, decision card, and trace inspection
@@ -57,6 +58,7 @@ Core modules:
 - `Act_RAG_RetrieveSimilarCases`
 - `Observe_SummarizeEvidence`
 - `Decide_DispatchDecision`
+- `LLM_Disambiguation`
 - `Confidence_Gating`
 - `Human_Review_Escalation`
 - `Response_Generator`
@@ -83,6 +85,7 @@ System diagram:
         +--> API response {status,error,response,steps}
         +--> Supabase executions table (complaint-linked runs)
 ```
+
 
 ## 🔧 Technical Architecture
 
@@ -117,10 +120,7 @@ Each execution returns:
 - Confidence score
 - Escalation flags
 
-The full ReAct trace includes:
-- Module name
-- Prompt payload
-- Response payload
+`steps[]` in the current implementation includes actual LLM calls only (for example, `LLM_Disambiguation` when gating conditions are met).
 
 ## 📁 Project Structure
 
@@ -155,7 +155,8 @@ dispatch-agent/
 |  |- supabase_schema.sql
 |- data/
 |- assets/
-|  |- Dispatch Agent.mp4
+|  |- quick_demo .gif
+|  |- quick_demo .mp4
 |- .env.example
 |- README.md
 ```
