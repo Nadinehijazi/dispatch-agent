@@ -4,7 +4,7 @@ Autonomous 311-style municipal complaint triage agent designed to replace manual
 
 ## 🎬 Quick Demo
 
-[![Dispatch AI Agent Demo](./backend/app/static/logo.png)](./assets/quick_demo.mp4)
+[![Dispatch AI Agent Demo](./assets/quick_demo%20.gif)](./assets/quick_demo%20.mp4)
 
 ## 🌟 Why Dispatch AI Agent
 
@@ -13,7 +13,7 @@ Autonomous 311-style municipal complaint triage agent designed to replace manual
 - **Structured reasoning pipeline**: ReAct-style modular flow instead of a single opaque model call
 - **Retrieval-grounded decisions**: vector search evidence is summarized and incorporated into deterministic policy logic
 - **Operational safety controls**: confidence gating and explicit human escalation
-- **Traceability by design**: every run returns detailed `steps[]` and can be persisted for audit
+- **Traceability by design**: every run returns `steps[]` entries for actual LLM calls and can be persisted for audit
 
 ## 💡 Real-World Triage Scenarios
 
@@ -54,6 +54,7 @@ Core modules:
 - `Act_RAG_RetrieveSimilarCases`
 - `Observe_SummarizeEvidence`
 - `Decide_DispatchDecision`
+- `LLM_Disambiguation`
 - `Confidence_Gating`
 - `Human_Review_Escalation`
 - `Response_Generator`
@@ -114,10 +115,7 @@ Each execution returns:
 - Confidence score
 - Escalation flags
 
-The full ReAct trace includes:
-- Module name
-- Prompt payload
-- Response payload
+`steps[]` in the current implementation includes actual LLM calls only (for example, `LLM_Disambiguation` when gating conditions are met).
 
 ## 📁 Project Structure
 
@@ -152,7 +150,8 @@ dispatch-agent/
 |  |- supabase_schema.sql
 |- data/
 |- assets/
-|  |- Dispatch Agent.mp4
+|  |- quick_demo .gif
+|  |- quick_demo .mp4
 |- .env.example
 |- README.md
 ```
