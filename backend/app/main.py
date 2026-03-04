@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -29,13 +29,14 @@ from .core.supabase_client import (
 )
 
 app = FastAPI(title="Dispatch AI Agent")
-static_dir = os.path.join(os.path.dirname(__file__), "../../static")
-app.mount("../../static", StaticFiles(directory=static_dir), name="static")
+static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+@app.get("/api/team_info")
 @app.get("/team_info")
 def team_info():
     return {
-        "group_batch_order_number": "Batch2_10",
+        "group_batch_order_number": "2_10",
         "team_name": "Nadine_Sara_Noor",
         "students": [
             {"name": "Nadine Hijazi", "email": "nadeenhijazi@campus.technion.ac.il"},
@@ -45,6 +46,7 @@ def team_info():
     }
 
 
+@app.get("/api/agent_info")
 @app.get("/agent_info")
 def agent_info():
     return {
@@ -97,6 +99,7 @@ def agent_info():
         ],
     }
 
+@app.get("/api/model_architecture")
 @app.get("/model_architecture")
 def model_architecture():
     png_path = os.path.join(os.path.dirname(__file__), "model_architecture.png")
@@ -127,6 +130,7 @@ class Step(BaseModel):
     response: Dict[str, Any]
 
 
+@app.post("/api/complaints")
 @app.post("/complaints")
 def create_complaint(payload: ComplaintCreate):
     try:
@@ -136,11 +140,11 @@ def create_complaint(payload: ComplaintCreate):
         if not payload.complaint_text or not payload.complaint_text.strip():
             return {"status": "error", "error": "complaint_text is required", "complaint_id": None}
 
-        # ✅ NEW CHECK: Borough required
+        # âœ… NEW CHECK: Borough required
         if not payload.borough or payload.borough.upper() == "UNKNOWN":
             return {"status": "error", "error": "borough is required", "complaint_id": None}
 
-        # ✅ NEW CHECK: Location details required
+        # âœ… NEW CHECK: Location details required
         if not payload.location_details or not payload.location_details.strip():
             return {"status": "error", "error": "location_details is required", "complaint_id": None}
 
@@ -166,6 +170,7 @@ def create_complaint(payload: ComplaintCreate):
     except Exception as e:
         return {"status": "error", "error": f"Supabase insert failed: {str(e)}", "complaint_id": None}
 
+@app.get("/api/complaints_recent")
 @app.get("/complaints_recent")
 def complaints_recent():
     try:
@@ -173,13 +178,14 @@ def complaints_recent():
     except Exception as e:
         return {"status": "error", "error": f"Supabase fetch failed: {str(e)}", "items": []}
 
+@app.post("/api/execute")
 @app.post("/execute")
 def execute(req: ExecuteRequest):
     """
     Course requirement:
     - Top-level response fields MUST be exactly: status, error, response, steps
-    - steps[] logs the full pipeline in order (module + prompt + response)
-    “We use gated LLM calls only when confidence is low or critical info is missing, to minimize cost.”
+    - steps[] logs actual LLM calls only (module + prompt + response)
+    - We use gated LLM calls only when confidence is low or critical info is missing.
     """
     try:
         complaint = None
@@ -320,10 +326,10 @@ def execute(req: ExecuteRequest):
 
                     # Final decision is refined only in this gated LLM step.
                     decision = llm_out
-                    # 🔒 FINAL AGENCY LOCK (after LLM)
+                    # ðŸ”’ FINAL AGENCY LOCK (after LLM)
                     if parsed.get("category") in (None, "unknown"):
                         decision["agency"] = "311 Triage (Unknown)"
-                    # 🔒 Lock urgency deterministically
+                    # ðŸ”’ Lock urgency deterministically
                     heur = estimate_urgency(
                         parsed.get("complaint_text", ""),
                         parsed.get("category", "unknown"),
@@ -331,7 +337,7 @@ def execute(req: ExecuteRequest):
                     )
                     decision["urgency"] = heur
 
-                    # 🔒 Cap confidence deterministically
+                    # ðŸ”’ Cap confidence deterministically
                     if parsed.get("category") in (None, "unknown"):
                         decision["confidence"] = min(decision.get("confidence", 0.0), 0.4)
 
@@ -413,9 +419,10 @@ def execute(req: ExecuteRequest):
 
 @app.get("/", response_class=HTMLResponse)
 def ui():
-    html_path = os.path.join(os.path.dirname(__file__), "../../static", "index.html")
+    html_path = os.path.join(static_dir, "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 
 

@@ -1,128 +1,101 @@
-# Dispatch AI Agent
+﻿# Dispatch AI Agent
 
-Autonomous 311-style municipal complaint triage agent designed to replace manual decision workflows by making real-time, auditable operational decisions (agency routing, urgency, and action planning) from unstructured citizen reports using retrieval-grounded reasoning, deterministic policy logic, and confidence-based human escalation.
+AI-powered NYC 311 complaint triage assistant that produces operational decisions (agency, urgency, action) from complaint text using deterministic preprocessing, retrieval from historical cases, and a gated LLM disambiguation step.
 
-<!-- ## 🎬 Quick Demo
-
-[![Dispatch AI Agent Demo](./backend/app/static/logo.png)](./assets/quick_demo.mp4) -->
-## 🎬 Quick Demo
+## Quick Demo
 
 ![Dispatch AI Agent Demo](./assets/quick_demo.gif)
-Full HD demo video: [assets/demo.mp4](./assets/quick_demo.mp4)
-## 🌟 Why Dispatch AI Agent
+Full HD demo video: [assets/quick_demo.mp4](./assets/quick_demo.mp4)
 
-### Unique Advantages
+## Why This Agent
 
-- **Structured reasoning pipeline**: ReAct-style modular flow instead of a single opaque model call
-- **Retrieval-grounded decisions**: vector search evidence is summarized and incorporated into deterministic policy logic
-- **Operational safety controls**: confidence gating and explicit human escalation
-- **Traceability by design**: every run returns `steps[]` entries for actual LLM calls and can be persisted for audit
+- Structured modular pipeline instead of a single opaque model call
+- Retrieval-grounded evidence from Pinecone
+- Confidence gating with human review escalation
+- Cost-aware design: LLM is called only when needed
+- Auditable API outputs and execution records
 
+## Required API Endpoints
 
-## 💡 Real-World Triage Scenarios
+- `GET /api/team_info`
+- `GET /api/agent_info`
+- `GET /api/model_architecture`
+- `POST /api/execute`
 
-See `examples/demo_cases.md` for real captured Quick Run outputs.
-These examples were captured using the current model configuration and may vary slightly across runs.
-## 🎯 System Features
+Also available as backward-compatible aliases without `/api`.
 
-### Intake & API
+## Agent Architecture
 
-- Structured complaint intake endpoint: `POST /api/complaints`
-- Main execution endpoint with strict contract: `POST /api/execute`
-- Required informational endpoints:
-  - `GET /api/team_info`
-  - `GET /api/agent_info`
-  - `GET /api/model_architecture`
-
-### Decisioning & Safety
-
-- ReAct-style module pipeline with canonical module names
-- Pinecone retrieval + evidence summarization (`agency_counts`, `top_score`, `total_matches`)
-- Deterministic policy decision with confidence scoring
-- Optional gated LLM disambiguation (`llm_decider.py`)
-- Confidence gating and human escalation (`needs_human_review`, follow-up signals)
-  
-### UI & Auditability
-
-- Single-page UI for intake, decision card, and trace inspection
-- Expandable execution trace with module/prompt/response
-- Complaint and execution persistence in Supabase
-- Recent complaints view for quick operational context
-
-## 🤖 Agent Architecture
-
-Core modules:
+High-level modules:
 
 - `Preprocessing_ContextExtraction`
 - `Reason_UnderstandComplaint`
 - `Act_RAG_RetrieveSimilarCases`
 - `Observe_SummarizeEvidence`
 - `Decide_DispatchDecision`
-- `LLM_Disambiguation`
+- `LLM_Disambiguation` (optional, gated)
 - `Confidence_Gating`
 - `Human_Review_Escalation`
 - `Response_Generator`
 
-System diagram:
+Execution flow:
 
 ```text
-[Static Frontend (single page)]
-        |
-        v
-[FastAPI /api/complaints] ---> [Supabase complaints table]
-        |
-        v
-[FastAPI /api/execute]
-   1) Preprocessing_ContextExtraction
-   2) Reason_UnderstandComplaint
-   3) Act_RAG_RetrieveSimilarCases ---> [LLMod embeddings] ---> [Pinecone]
-   4) Observe_SummarizeEvidence
-   5) Decide_DispatchDecision
-   6) Confidence_Gating
-   7) Human_Review_Escalation
-   8) Response_Generator
-        |
-        +--> API response {status,error,response,steps}
-        +--> Supabase executions table (complaint-linked runs)
+Input_Complaint
+  -> Preprocessing_ContextExtraction
+  -> Reason_UnderstandComplaint
+  -> Act_RAG_RetrieveSimilarCases
+  -> Observe_SummarizeEvidence
+  -> Decide_DispatchDecision
+  -> [Low confidence or missing critical info?]
+       Yes -> LLM_Disambiguation -> Confidence_Gating
+       No  ---------------------> Confidence_Gating
+  -> Human_Review_Escalation
+  -> Response_Generator
+  -> API_Output
 ```
 
+## `/api/execute` Output Contract
 
-## 🔧 Technical Architecture
+Top-level response fields:
 
-### Backend
+```json
+{
+  "status": "ok",
+  "error": null,
+  "response": "...",
+  "steps": []
+}
+```
 
-- FastAPI application in `backend/app/main.py`
-- Core orchestration and domain logic in `backend/app/core/`
+Error format:
 
-### Retrieval Layer
+```json
+{
+  "status": "error",
+  "error": "Human-readable error",
+  "response": null,
+  "steps": []
+}
+```
 
-- Pinecone vector search in `backend/app/core/rag.py`
-- Query embeddings through LLMod OpenAI-compatible endpoint
+`steps[]` semantics in this implementation:
 
-### Persistence
+- Includes actual LLM calls only
+- Deterministic and retrieval steps are not included in `steps[]`
+- `steps` may be empty for straightforward cases
+- When invoked, `LLM_Disambiguation` appears with `module`, `prompt`, and `response`
 
-- Supabase integration in `backend/app/core/supabase_client.py`
-- Complaint and execution records persisted for audit
+## Tech Stack
 
-### Frontend
+- FastAPI (`backend/app/main.py`)
+- Pinecone retrieval (`backend/app/core/rag.py`)
+- LLM disambiguation (`backend/app/core/llm_decider.py`)
+- Rule-based decision logic (`backend/app/core/decision.py`, `backend/app/core/preprocessing.py`)
+- Supabase persistence (`backend/app/core/supabase_client.py`)
+- Static frontend served by FastAPI (`index.html`, `style.css`, `app.js`, `logo.png`)
 
-- Static UI served by FastAPI:
-  - `backend/app/static/index.html`
-  - `backend/app/static/style.css`
-  - `backend/app/static/app.js`
-
-## 📊 System Outputs
-
-Each execution returns:
-- Agency recommendation
-- Urgency level
-- Action plan
-- Confidence score
-- Escalation flags
-
-`steps[]` in the current implementation includes actual LLM calls only (for example, `LLM_Disambiguation` when gating conditions are met).
-
-## 📁 Project Structure
+## Project Structure
 
 ```text
 dispatch-agent/
@@ -137,102 +110,83 @@ dispatch-agent/
 |  |  |  |- llm_decider.py
 |  |  |  |- formatting.py
 |  |  |  |- supabase_client.py
-|  |  |- static/
-|  |  |  |- index.html
-|  |  |  |- style.css
-|  |  |  |- app.js
-|  |  |  |- logo.png
+|- index.html
+|- style.css
+|- app.js
+|- logo.png
 |- examples/
-|  |- demo_cases.md
-|  |- demo_cases.json
 |- scripts/
-|  |- download_311_data.py
-|  |- clean_311_data.py
-|  |- embed_311_openai_compat.py
-|  |- pinecone_upsert.py
-|  |- eval_routing.py
-|  |- sanity_execute.py
-|  |- supabase_schema.sql
 |- data/
 |- assets/
-|  |- quick_demo .gif
-|  |- quick_demo .mp4
 |- .env.example
+|- requirements.txt
 |- README.md
 ```
 
-## 🚀 Getting Started
+## Local Setup
 
-### Prerequisites
+Prerequisites:
 
-- Python 3.10+ recommended
-- Pinecone account and index credentials
-- LLMod API key
-- Supabase project with required tables
+- Python 3.10+
+- Pinecone index and API key
+- LLMOD API key
+- Supabase project/tables
 
-### Installation
-
-1. Clone repository:
-
-```bash
-git clone https://github.com/Nadinehijazi/dispatch-agent.git
-cd dispatch-agent
-```
-
-2. Create and activate virtual environment (Windows PowerShell):
+Install:
 
 ```powershell
 python -m venv backend\.venv
 backend\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-3. Install dependencies:
-
-```powershell
-pip install fastapi uvicorn pydantic requests pandas openai pinecone python-dotenv certifi
-```
-
-4. Configure environment:
-
-```powershell
-copy .env.example .env
-```
-
-Set values in `.env`:
-
-```env
-PINECONE_API_KEY=...
-PINECONE_INDEX_NAME=nyc-311-dispatch
-PINECONE_HOST=...
-PINECONE_CLOUD=aws
-PINECONE_REGION=us-east-1
-
-LLMOD_API_KEY=...
-LLMOD_BASE_URL=https://api.llmod.ai
-EMBEDDING_MODEL=RPRTHPB-text-embedding-3-small
-CHAT_MODEL=RPRTHPB-gpt-5-mini
-
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_COMPLAINTS_TABLE=complaints
-SUPABASE_EXECUTIONS_TABLE=executions
-```
-
-5. Create Supabase schema:
-
-```text
-scripts/supabase_schema.sql
-```
-
-### Running Locally
+Run:
 
 ```powershell
 backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload
 ```
 
 Open:
+
 - App UI: `http://127.0.0.1:8000/`
 - API docs: `http://127.0.0.1:8000/docs`
 
+## Environment Variables
 
+Required in production:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_COMPLAINTS_TABLE`
+- `SUPABASE_EXECUTIONS_TABLE`
+- `LLMOD_API_KEY`
+- `LLMOD_BASE_URL`
+- `EMBEDDING_MODEL`
+- `CHAT_MODEL`
+- `PINECONE_API_KEY`
+- `PINECONE_INDEX_NAME`
+- `PINECONE_HOST` (recommended)
+
+Optional / currently unused by runtime code:
+
+- `SUPABASE_ANON_KEY`
+- `PINECONE_CLOUD`
+- `PINECONE_REGION`
+
+## Deploy on Render
+
+Create a **Web Service** and use:
+
+- Build command:
+  - `pip install -r requirements.txt`
+- Start command:
+  - `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
+
+Then add the required environment variables above, deploy, and verify:
+
+- `/`
+- `/docs`
+- `/api/team_info`
+- `/api/agent_info`
+- `/api/model_architecture`
+- `/api/execute` (POST via docs)
