@@ -1,5 +1,6 @@
+import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 def _load_dotenv(path: str = ".env") -> None:
     if not os.path.exists(path):
@@ -22,16 +23,71 @@ def _get_env(name: str) -> Optional[str]:
 def llm_available() -> bool:
     return bool(_get_env("LLMOD_API_KEY") and _get_env("LLMOD_BASE_URL") and _get_env("CHAT_MODEL"))
 
-def llm_decide(parsed: Dict[str, Any], evidence: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Returns a strict decision dict:
-    {agency, urgency, action, justification, confidence}
-    """
+
+def _openai_client():
     api_key = _get_env("LLMOD_API_KEY")
     base_url = _get_env("LLMOD_BASE_URL")
     model = _get_env("CHAT_MODEL")
     if not (api_key and base_url and model):
         raise ValueError("LLM not configured (missing LLMOD_API_KEY / LLMOD_BASE_URL / CHAT_MODEL)")
+
+    from openai import OpenAI
+
+    return OpenAI(api_key=api_key, base_url=base_url), model
+
+
+def llm_plan_next_action(state_snapshot: Dict[str, Any], allowed_actions: List[str]) -> Dict[str, Any]:
+    client, model = _openai_client()
+
+    system = (
+        "You are the planner for a municipal 311 ReAct agent. "
+        "Choose the single best next action based on current state. "
+        "Return ONLY valid JSON with keys: thought, action, why, need_more_information. "
+        "Allowed actions are provided by the user. "
+        "Use RETRIEVE_SIMILAR_CASES when historical evidence would reduce routing uncertainty. "
+        "Use RUN_LLM_DISAMBIGUATION only when ambiguity remains after current evidence. "
+        "Use FINALIZE_DECISION if enough information already exists. "
+        "Use ASK_FOR_MISSING_INFO if critical dispatch fields are missing. "
+        "Be concise and operational."
+    )
+
+    user_payload = {
+        "allowed_actions": allowed_actions,
+        "state": state_snapshot,
+        "task": "Choose the next best action for the agent.",
+    }
+
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
+        ],
+    )
+
+    text = resp.choices[0].message.content or "{}"
+    try:
+        out = json.loads(text)
+    except Exception as exc:
+        raise ValueError(f"Planner returned non-JSON: {text[:200]}") from exc
+
+    action = str(out.get("action") or "").strip()
+    if action not in allowed_actions:
+        raise ValueError(f"Planner returned unsupported action: {action}")
+
+    return {
+        "thought": str(out.get("thought") or "Planner selected the next action from current state.").strip(),
+        "action": action,
+        "why": str(out.get("why") or "").strip(),
+        "need_more_information": bool(out.get("need_more_information", False)),
+    }
+
+def llm_decide(parsed: Dict[str, Any], evidence: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Returns a strict decision dict:
+    {agency, urgency, action, justification, confidence}
+    """
+    client, model = _openai_client()
 
     # Keep prompt SMALL to save budget
     complaint_text = (parsed.get("complaint_text") or "")[:800]
@@ -81,21 +137,17 @@ def llm_decide(parsed: Dict[str, Any], evidence: Optional[Dict[str, Any]] = None
         "task": "Decide the best agency + urgency + recommended action for dispatch.",
     }
 
-    from openai import OpenAI
-    client = OpenAI(api_key=api_key, base_url=base_url)
-
     resp = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": str(user)},
+            {"role": "user", "content": json.dumps(user, ensure_ascii=True)},
         ],
     )
 
     text = resp.choices[0].message.content or "{}"
 
     # Parse JSON safely
-    import json
     try:
         out = json.loads(text)
     except Exception:

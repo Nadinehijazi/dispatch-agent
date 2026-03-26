@@ -19,6 +19,30 @@ def build_reasoning(parsed: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _build_natural_justification(
+    parsed: Dict[str, Any],
+    evidence: Dict[str, Any] | None = None,
+) -> str | None:
+    category = parsed.get("category")
+    location = parsed.get("location") or parsed.get("location_details")
+    time_24h = parsed.get("time_24h")
+    recurrence = parsed.get("recurrence")
+
+    if category == "noise" and location and time_24h and recurrence:
+        return (
+            f"Recurring late-night noise at {time_24h} in {location} is a straightforward non-emergency "
+            "quality-of-life complaint with enough detail to route directly without additional evidence."
+        )
+
+    if category == "sanitation" and evidence and evidence.get("total_matches"):
+        return (
+            "Visible garbage and reported rats indicate a sanitation issue with public-health impact, so "
+            "sanitation cleanup and rodent-control follow-up are both appropriate."
+        )
+
+    return None
+
+
 def build_dispatch_decision(
     parsed: Dict[str, Any],
     draft_decision: Dict[str, Any],
@@ -67,6 +91,13 @@ def build_dispatch_decision(
     )
     if parsed.get("category") == "safety" and draft_decision.get("urgency_guess") == "high":
         confidence = max(confidence, 0.85)
+
+    straightforward_noise = (
+        parsed.get("category") == "noise"
+        and has_any_location
+        and bool(parsed.get("time_24h"))
+        and bool(parsed.get("recurrence"))
+    )
 
     if not has_any_location:
         confidence -= 0.10
@@ -128,10 +159,13 @@ def build_dispatch_decision(
             else:
                 confidence = max(0.20, confidence - 0.05)
 
+    if straightforward_noise and not evidence and not is_vague:
+        confidence = max(confidence, 0.78)
+
     return {
         "agency": draft_decision["agency_guess"],
         "urgency": draft_decision["urgency_guess"],
         "action": draft_decision["action_guess"],
-        "justification": ", ".join(justification_parts),
+        "justification": _build_natural_justification(parsed, evidence) or ", ".join(justification_parts),
         "confidence": round(confidence, 2),
     }
