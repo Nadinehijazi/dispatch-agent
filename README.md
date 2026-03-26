@@ -2,7 +2,6 @@
 
 Dispatch AI Agent is an NYC 311 complaint triage system implemented as a ReAct agent. Given a citizen complaint, the agent iterates through Thought -> Action -> Observation cycles and decides what to do next: parse the complaint, retrieve similar historical cases, ask for missing information, run LLM disambiguation, escalate immediately, or finalize a dispatch decision.
 
-The system is built to satisfy the course requirement that the project be agentic rather than a fixed automation pipeline. Retrieval is optional, LLM use is selective, and emergency or irrelevant cases can stop early without wasting steps.
 
 ## What The Agent Does
 
@@ -321,23 +320,6 @@ What to check in `verify_react_paths.py` output:
 - irrelevant case shows `MARK_IRRELEVANT`
 - ambiguous cases should show `reasoning_mode = llm_planner` when planner connectivity is available
 
-## Deployment
-
-For Render:
-
-- Build command:
-  - `pip install -r requirements.txt`
-- Start command:
-  - `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
-
-After deployment, verify:
-
-- `/`
-- `/docs`
-- `/api/team_info`
-- `/api/agent_info`
-- `/api/model_architecture`
-- `/api/execute`
 
 ## Notes
 
